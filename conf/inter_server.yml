@@ -41,6 +41,11 @@ Body:
     Name: "Storage"
     Table: storage
 
+  - ID: 1
+    Name: "Collection_Storage"
+    Table: collection_storage
+    Max: 100
+
 Footer:
   Imports:
     - Path: conf/import/inter_server.yml

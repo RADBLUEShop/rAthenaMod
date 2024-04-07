@@ -1258,4 +1258,9 @@ void clif_set_npc_window_size(map_session_data& sd, int width, int height);
 void clif_set_npc_window_pos(map_session_data& sd, int x, int y);
 void clif_set_npc_window_pos_percent(map_session_data& sd, int x, int y);
 
+/// Limited cash shop
+int clif_CashShopLimited_sub(map_session_data *sd,va_list ap);
+void clif_CashShopLimited(map_session_data* sd );
+void clif_parse_CashShopLimited( int fd,map_session_data* sd );
+
 #endif /* CLIF_HPP */

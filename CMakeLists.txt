@@ -503,7 +503,6 @@ set( DEVELOPMENT_DIRECTORIES
 	"3rdparty"
 	"conf/import-tmpl"
 	"conf/msg_conf/import-tmpl"
-	"db/import-tmpl"
 	"src"
 	)
 set( RUNTIME_FILES
@@ -572,7 +571,7 @@ if( INSTALL_COMPONENT_RUNTIME )
 	set( _TEMPLATES
 		"conf/import-tmpl" "conf/import"
 		"conf/msg_conf/import-tmpl" "conf/msg_conf/import"
-		"db/import-tmpl" "db/import"
+		"db/import"
 		)
 	set( INSTALL_TEMPLATES_FILE "${CMAKE_CURRENT_BINARY_DIR}/InstallTemplates.cmake" )
 	file( WRITE "${INSTALL_TEMPLATES_FILE}"

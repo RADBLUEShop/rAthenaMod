@@ -86,6 +86,7 @@ enum e_sale_add_result {
 
 struct sale_item_data{
 	// Data
+	uint32 id;
 	t_itemid nameid;
 	time_t start;
 	time_t end;
@@ -94,6 +95,7 @@ struct sale_item_data{
 	// Timers
 	int timer_start;
 	int timer_end;
+	int timer_rental;
 };
 
 struct sale_item_db{
@@ -105,9 +107,10 @@ struct sale_item_db{
 extern struct sale_item_db sale_items;
 
 struct sale_item_data* sale_find_item(t_itemid nameid, bool onsale);
-enum e_sale_add_result sale_add_item(t_itemid nameid, int32 count, time_t from, time_t to);
+enum e_sale_add_result sale_add_item(t_itemid nameid, int32 count, time_t from, time_t to, time_t rental);
 bool sale_remove_item(t_itemid nameid);
 void sale_notify_login( map_session_data* sd );
+void sale_load_pc(map_session_data* sd );
 #endif
 
 #endif /* CASHSHOP_HPP */

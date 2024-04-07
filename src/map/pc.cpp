@@ -64,6 +64,7 @@
 #include "storage.hpp"
 #include "unit.hpp" // unit_stop_attack(), unit_stop_walking()
 #include "vending.hpp" // struct s_vending
+#include "cashshop.hpp"
 
 using namespace rathena;
 
@@ -2451,6 +2452,10 @@ void pc_reg_received(map_session_data *sd)
 			clif_changeoption( &sd->bl );
 		}
 	}
+
+#if PACKETVER_SUPPORTS_SALES
+	sale_load_pc(sd);
+#endif
 
 	channel_autojoin(sd);
 }

@@ -480,6 +480,8 @@ public:
 	int langtype;
 	struct mmo_charstatus status;
 
+	std::vector<std::pair<int, int>> sales;
+
 	// Item Storages
 	struct s_storage storage, premiumStorage;
 	struct s_storage inventory;
