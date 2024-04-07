@@ -2374,6 +2374,7 @@ void pc_reg_received(map_session_data *sd)
 	sd->state.pc_loaded = false; // Ensure inventory data and status data is loaded before we calculate player stats
 
 	intif_storage_request(sd,TABLE_STORAGE, 0, STOR_MODE_ALL); // Request storage data
+	intif_storage_request(sd,TABLE_STORAGE, battle_config.collection_storage_id, STOR_MODE_ALL); // Request storage data
 	intif_storage_request(sd,TABLE_CART, 0, STOR_MODE_ALL); // Request cart data
 	intif_storage_request(sd,TABLE_INVENTORY, 0, STOR_MODE_ALL); // Request inventory data
 
@@ -11818,6 +11819,96 @@ int pc_load_combo(map_session_data *sd) {
 	return ret;
 }
 
+bool collection_mode(map_session_data *sd)
+{
+	nullpo_retr(false,sd);
+
+	struct map_data *mapdata = map_getmapdata(sd->bl.m);
+
+	if(mapdata == nullptr)
+		return false;
+
+	bool ret = false;
+
+	if(battle_config.collection_bonus_mode){
+		if(battle_config.collection_bonus_mode&E_COLLECTION_NORMAL && !mapdata_flag_vs(mapdata))
+			ret = true;
+		if(battle_config.collection_bonus_mode&E_COLLECTION_PVP && mapdata->getMapFlag(MF_PVP))
+			ret = true;
+		if(battle_config.collection_bonus_mode&E_COLLECTION_GUILDWAR && mapdata_flag_gvg(mapdata))
+			ret = true;
+	}else{
+		// effect normal/pvp/gvg
+		return true;
+	}
+
+	return ret;
+}
+
+int pc_premium_storage_exists(map_session_data *sd, t_itemid id) {
+	for (int i = 0; i < battle_config.max_collection_count; i++){
+		if (sd->collectionStorage.u.items_storage[i].nameid == id)
+			return 1;
+	}
+
+	return 0;
+}
+
+int pc_premium_storage_count(map_session_data *sd, t_itemid id) {
+	for (int i = 0; i < battle_config.max_collection_count; i++){
+		if (sd->collectionStorage.u.items_storage[i].nameid == id)
+			return sd->collectionStorage.u.items_storage[i].amount;
+	}
+
+	return 0;
+}
+
+/**
+ * Called when an item with combo is worn
+ * @param sd: Player data
+ * @param data: Item data
+ * @return Number of succeeded combo(s)
+ */
+void pc_check_collection_combo(map_session_data *sd, item_data *data) {
+	for (const auto &collection_combo : data->collection_combos) {
+
+		bool do_continue = false;
+
+		// Ensure this isn't a duplicate combo
+		for (const auto player_collection_combo : sd->collection_combos) {
+			if (player_collection_combo->id == collection_combo->id) {
+				do_continue = true;
+				break;
+			}
+		}
+
+		// Combo already equipped
+		if (do_continue)
+			continue;
+
+		size_t nb_itemCombo = collection_combo->nameid.size();
+
+		if (nb_itemCombo < 2) // A combo with less then 2 item?
+			continue;
+
+		int check = 0;
+
+		for( size_t i = 0; i < nb_itemCombo; i++ )
+			check += pc_premium_storage_exists(sd, collection_combo->nameid[i]);
+
+		// skip if not all items are in premium storage
+		if( check < nb_itemCombo )
+			continue;
+
+		// All items in the combo are matching
+		auto entry = std::make_shared<s_collection_combos>();
+
+		entry->bonus = collection_combo->script;
+		entry->id = collection_combo->id;
+		sd->collection_combos.push_back(entry);
+	}
+}
+
 /*==========================================
  * Equip item on player sd at req_pos from inventory index n
  * return: false - fail; true - success
@@ -15823,6 +15914,17 @@ uint64 CaptchaDatabase::parseBodyNode(const ryml::NodeRef &node) {
 		captcha_db.put(index, cd);
 
 	return 1;
+}
+
+// for collection
+TIMER_FUNC(pc_cal_status_timer){
+	map_session_data *sd = map_id2sd(id);
+
+	if(!sd)
+		return 1;
+
+	status_calc_pc(sd, SCO_NONE);
+	return 0;
 }
 
 /*==========================================

@@ -248,6 +248,26 @@ static int storage_additem(map_session_data* sd, struct s_storage *stor, struct 
 		return 1;
 
 	data = itemdb_search(it->nameid);
+	std::shared_ptr<item_data> cdata = item_db.find(it->nameid);
+
+	char output_msg[CHAT_SIZE_MAX];
+	memset(output_msg, '\0', sizeof(output_msg));
+
+	if(sd->state.collection_open){
+		if(!item_is_collection(it->nameid)){
+			sprintf(output_msg,msg_txt(sd,1641),item_db.create_item_link(cdata).c_str());
+			clif_messagecolor(&sd->bl, color_table[COLOR_CYAN], output_msg, false, SELF);
+			return 1;
+		}else if (item_is_collection(it->nameid) && !item_is_collection_stack(it->nameid) && pc_premium_storage_exists(sd,it->nameid)){
+			sprintf(output_msg,msg_txt(sd,1644),item_db.create_item_link(cdata).c_str());
+			clif_messagecolor(&sd->bl, color_table[COLOR_CYAN], output_msg, false, SELF);
+			return 1;
+		}else if (item_is_collection_stack(it->nameid) && (amount + pc_premium_storage_count(sd,it->nameid)) > battle_config.collection_max_stored){
+			sprintf(output_msg,msg_txt(sd,1645),item_db.create_item_link(cdata).c_str(), battle_config.collection_max_stored);
+			clif_messagecolor(&sd->bl, color_table[COLOR_CYAN], output_msg, false, SELF);
+			return 1;
+		}
+	}
 
 	if( data->stack.storage && amount > data->stack.amount ) // item stack limitation
 		return 2;
@@ -268,10 +288,16 @@ static int storage_additem(map_session_data* sd, struct s_storage *stor, struct 
 				if( amount > MAX_AMOUNT - stor->u.items_storage[i].amount || ( data->stack.storage && amount > data->stack.amount - stor->u.items_storage[i].amount ) )
 					return 2;
 
+					if(sd->state.collection_open){
+						sprintf(output_msg,msg_txt(sd,1646),item_db.create_item_link(cdata).c_str(), amount);
+						clif_messagecolor(&sd->bl, color_table[COLOR_CYAN], output_msg, false, SELF);
+					}
+
 				stor->u.items_storage[i].amount += amount;
 				stor->dirty = true;
 				clif_storageitemadded(sd,&stor->u.items_storage[i],i,amount);
 
+				add_timer(gettick() + 100, pc_cal_status_timer, sd->bl.id, 0);
 				return 0;
 			}
 		}
@@ -285,6 +311,18 @@ static int storage_additem(map_session_data* sd, struct s_storage *stor, struct 
 	if( i >= stor->max_amount )
 		return 2;
 
+	if(sd->state.collection_open){
+		if(item_is_collection_stack(it->nameid)){
+			// success add item to collection
+			sprintf(output_msg,msg_txt(sd,1646),item_db.create_item_link(cdata).c_str(), amount);
+			clif_messagecolor(&sd->bl, color_table[COLOR_CYAN], output_msg, false, SELF);
+		}else if(item_is_collection(it->nameid)){
+			// success add item to collection
+			sprintf(output_msg,msg_txt(sd,1642),item_db.create_item_link(cdata).c_str());
+			clif_messagecolor(&sd->bl, color_table[COLOR_CYAN], output_msg, false, SELF);
+		}
+	}
+
 	// add item to slot
 	memcpy(&stor->u.items_storage[i],it,sizeof(stor->u.items_storage[0]));
 	stor->amount++;
@@ -293,6 +331,7 @@ static int storage_additem(map_session_data* sd, struct s_storage *stor, struct 
 	clif_storageitemadded(sd,&stor->u.items_storage[i],i,amount);
 	clif_updatestorageamount(sd, stor->amount, stor->max_amount);
 
+	add_timer(gettick() + 100, pc_cal_status_timer, sd->bl.id, 0);
 	return 0;
 }
 
@@ -314,13 +353,14 @@ int storage_delitem(map_session_data* sd, struct s_storage *stor, int index, int
 	if( stor->u.items_storage[index].amount == 0 ) {
 		memset(&stor->u.items_storage[index],0,sizeof(stor->u.items_storage[0]));
 		stor->amount--;
-		if( sd->state.storage_flag == 1 || sd->state.storage_flag == 3 )
+		if( sd->state.storage_flag == 1 || sd->state.storage_flag >= 3 )
 			clif_updatestorageamount(sd, stor->amount, stor->max_amount);
 	}
 
-	if( sd->state.storage_flag == 1 || sd->state.storage_flag == 3 )
+	if( sd->state.storage_flag == 1 || sd->state.storage_flag >= 3 )
 		clif_storageitemremoved(sd,index,amount);
 
+	add_timer(gettick() + 100, pc_cal_status_timer, sd->bl.id, 0);
 	return 0;
 }
 
@@ -376,11 +416,25 @@ void storage_storageget(map_session_data *sd, struct s_storage *stor, int index,
 	if (result != STORAGE_ADD_OK)
 		return;
 
+	struct item item_data = stor->u.items_storage[index];
+
 	if ((flag = pc_additem(sd,&stor->u.items_storage[index],amount,LOG_TYPE_STORAGE)) == ADDITEM_SUCCESS)
 		storage_delitem(sd,stor,index,amount);
 	else {
 		clif_storageitemremoved(sd,index,0);
 		clif_additem(sd,0,0,flag);
+	}
+
+	if(sd->state.collection_open){
+		char output_msg[CHAT_SIZE_MAX];
+		memset(output_msg, '\0', sizeof(output_msg));
+
+		if(amount > 1)
+			sprintf(output_msg,msg_txt(sd,1647),item_db.create_item_link(item_data).c_str(), amount);
+		else
+			sprintf(output_msg,msg_txt(sd,1643),item_db.create_item_link(item_data).c_str());
+
+		clif_messagecolor(&sd->bl, color_table[COLOR_CYAN], output_msg, false, SELF);
 	}
 }
 
@@ -1123,6 +1177,18 @@ void storage_premiumStorage_open(map_session_data *sd) {
 }
 
 /**
+ * Open collection storage
+ **/
+void storage_collectionStorage_open(map_session_data *sd){
+	nullpo_retv(sd);
+
+	sd->state.storage_flag = 4;
+	storage_sortitem(sd->collectionStorage.u.items_storage, ARRAYLENGTH(sd->collectionStorage.u.items_storage));
+	clif_storagelist(sd, sd->collectionStorage.u.items_storage, ARRAYLENGTH(sd->collectionStorage.u.items_storage), storage_getName(sd->collectionStorage.stor_id));
+	clif_updatestorageamount(sd, sd->collectionStorage.amount, sd->collectionStorage.max_amount);
+}
+
+/**
  * Request to open premium storage
  * @param sd Player who request
  * @param num Storage number
@@ -1158,6 +1224,36 @@ bool storage_premiumStorage_load(map_session_data *sd, uint8 num, uint8 mode) {
 }
 
 /**
+ * Load Collection Storage
+ **/
+bool storage_collectionStorage_load(map_session_data *sd, uint8 num, uint8 mode) {
+	nullpo_ret(sd);
+
+	if (sd->state.storage_flag)
+		return 0;
+
+	if (sd->state.vending || sd->state.buyingstore || sd->state.prevend || sd->state.autotrade)
+		return 0;
+
+	if (sd->state.banking || sd->state.callshop)
+		return 0;
+
+	if (!pc_can_give_items(sd)) { // check is this GM level is allowed to put items to storage
+		clif_displaymessage(sd->fd, msg_txt(sd,246));
+		return 0;
+	}
+
+	if(sd->collectionStorage.stor_id != num)
+		return intif_storage_request(sd, TABLE_STORAGE, num, mode);
+	else {
+		sd->collectionStorage.state.put = (mode&STOR_MODE_PUT) ? 1 : 0;
+		sd->collectionStorage.state.get = (mode&STOR_MODE_GET) ? 1 : 0;
+		storage_collectionStorage_open(sd);
+	}
+	return 1;
+}
+
+/**
  * Request to save premium storage
  * @param sd Player who has the storage
  * @author [Cydh]
@@ -1166,6 +1262,17 @@ void storage_premiumStorage_save(map_session_data *sd) {
 	nullpo_retv(sd);
 
 	intif_storage_save(sd, &sd->premiumStorage);
+}
+
+/**
+ * Request to save collection storage
+ * @param sd Player who has the storage
+ * @author [Cydh]
+ **/
+void storage_collectionStorage_save(map_session_data *sd) {
+	nullpo_retv(sd);
+
+	intif_storage_save(sd, &sd->collectionStorage);
 }
 
 /**
@@ -1183,8 +1290,16 @@ void storage_premiumStorage_close(map_session_data *sd) {
 			storage_premiumStorage_save(sd);	
 	}
 
-	if( sd->state.storage_flag == 3 ){
+	if (sd->collectionStorage.dirty) {
+		if (save_settings&CHARSAVE_STORAGE)
+			chrif_save(sd, CSAVE_INVENTORY|CSAVE_CART);
+		else
+			storage_collectionStorage_save(sd);
+	}
+
+	if( sd->state.storage_flag >= 3 ){
 		sd->state.storage_flag = 0;
+		sd->state.collection_open = false;
 		clif_storageclose( sd );
 	}
 }
@@ -1199,6 +1314,8 @@ void storage_premiumStorage_quit(map_session_data *sd) {
 
 	if (save_settings&CHARSAVE_STORAGE)
 		chrif_save(sd, CSAVE_INVENTORY|CSAVE_CART);
-	else
+	else{
 		storage_premiumStorage_save(sd);
+		storage_collectionStorage_save(sd);
+	}
 }

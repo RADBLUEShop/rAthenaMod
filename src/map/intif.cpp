@@ -3449,6 +3449,8 @@ static bool intif_parse_StorageReceived(int fd)
 		case TABLE_STORAGE:
 			if (p->stor_id == 0)
 				stor = &sd->storage;
+			else if (p->stor_id == battle_config.collection_storage_id)
+				stor = &sd->collectionStorage;
 			else
 				stor = &sd->premiumStorage;
 			break;
@@ -3525,9 +3527,12 @@ static bool intif_parse_StorageReceived(int fd)
 			break;
 
 		case TABLE_STORAGE:
-			if (stor->stor_id)
-				storage_premiumStorage_open(sd);
-			else {
+			if (stor->stor_id){
+				if(stor->stor_id == battle_config.collection_storage_id)
+					storage_collectionStorage_open(sd);
+				else
+					storage_premiumStorage_open(sd);
+			} else {
 #ifdef VIP_ENABLE
 				if (!pc_isvip(sd))
 					stor->max_amount = MIN_STORAGE;

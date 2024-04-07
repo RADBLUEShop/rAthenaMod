@@ -27231,6 +27231,56 @@ BUILDIN_FUNC(setdialogpospercent){
 	return SCRIPT_CMD_SUCCESS;
 }
 
+/*=======================================================
+ *-------------------------------------------------------*/
+BUILDIN_FUNC(opencollection) {
+	TBL_PC *sd = NULL;
+
+	if (!script_rid2sd(sd)) {
+		return SCRIPT_CMD_FAILURE;
+	}
+
+	sd->state.collection_open = true;
+	script_pushint(st, storage_collectionStorage_load(sd, battle_config.collection_storage_id, STOR_MODE_ALL));
+	return SCRIPT_CMD_SUCCESS;
+}
+
+/*=======================================================
+ *-------------------------------------------------------*/
+BUILDIN_FUNC(getcolrefine)
+{
+	TBL_PC *sd;
+	if (script_rid2sd(sd)){
+		if( current_collection_index == -1 ){
+			script_pushint(st, 0);
+			return SCRIPT_CMD_FAILURE;
+		}
+
+		script_pushint(st,sd->collectionStorage.u.items_storage[current_collection_index].refine);
+
+	}else
+		script_pushint(st,0);
+	return SCRIPT_CMD_SUCCESS;
+}
+
+/*=======================================================
+ *-------------------------------------------------------*/
+BUILDIN_FUNC(getcolenchantgrade)
+{
+	TBL_PC *sd;
+	if (script_rid2sd(sd)){
+		if( current_collection_index == -1 ){
+			script_pushint(st, 0);
+			return SCRIPT_CMD_FAILURE;
+		}
+
+		script_pushint(st,sd->collectionStorage.u.items_storage[current_collection_index].enchantgrade);
+
+	}else
+		script_pushint(st,0);
+	return SCRIPT_CMD_SUCCESS;
+}
+
 #include <custom/script.inc>
 
 // declarations that were supposed to be exported from npc_chat.cpp
@@ -27995,6 +28045,10 @@ struct script_function buildin_func[] = {
 	BUILDIN_DEF(setdialogsize, "ii"),
 	BUILDIN_DEF(setdialogpos, "ii"),
 	BUILDIN_DEF(setdialogpospercent, "ii"),
+
+	BUILDIN_DEF(opencollection, ""),
+	BUILDIN_DEF(getcolrefine,""),
+	BUILDIN_DEF(getcolenchantgrade,""),	
 
 #include <custom/script_def.inc>
 

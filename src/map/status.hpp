@@ -2752,6 +2752,7 @@ extern short current_equip_item_index;
 extern unsigned int current_equip_combo_pos;
 extern int current_equip_card_id;
 extern short current_equip_opt_index;
+extern short current_collection_index;
 
 //Status change option definitions (options are what makes status changes visible to chars
 //who were not on your field of sight when it happened)
@@ -3506,6 +3507,14 @@ unsigned short status_base_atk(const struct block_list *bl, const struct status_
 
 // Status changes accessors for StatusChange database
 uint16 status_efst_get_bl_type(enum efst_type efst);
+
+enum e_collection_mode : uint8_t {
+	E_COLLECTION_NORMAL		=	0x01,
+	E_COLLECTION_PVP		=	0x02,
+	E_COLLECTION_GUILDWAR	=	0x04,
+};
+
+bool collection_mode(map_session_data *sd);
 
 void status_readdb( bool reload = false );
 void do_init_status(void);

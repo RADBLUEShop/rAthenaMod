@@ -374,6 +374,11 @@ struct s_qi_display {
 	e_questinfo_markcolor color;
 };
 
+struct s_collection_combos {
+	script_code *bonus;
+	uint32 id;
+};
+
 class map_session_data {
 public:
 	struct block_list bl;
@@ -457,6 +462,7 @@ public:
 		uint64 item_enchant_index;
 		bool open_extended_vending;
 		t_itemid vending_item;
+		bool collection_open;
 	} state;
 	struct {
 		unsigned char no_weapon_damage, no_magic_damage, no_misc_damage;
@@ -488,6 +494,7 @@ public:
 	struct s_storage storage, premiumStorage;
 	struct s_storage inventory;
 	struct s_storage cart;
+	struct s_storage collectionStorage;
 
 	struct item_data* inventory_data[MAX_INVENTORY]; // direct pointers to itemdb entries (faster than doing item_id lookups)
 	short equip_index[EQI_MAX];
@@ -850,6 +857,12 @@ public:
 #endif
 
 	std::vector<std::shared_ptr<s_combos>> combos;
+	std::vector<std::shared_ptr<s_collection_combos>> collection_combos;
+
+	struct {
+		t_itemid nameid;
+		int index, amount;
+	} collection_info;
 
 	/**
 	 * Guarantees your friend request is legit (for bugreport:4629)
@@ -1755,5 +1768,11 @@ void pc_macro_reporter_process(map_session_data &sd, int32 reporter_account_id =
 #ifdef MAP_GENERATOR
 void pc_reputation_generate();
 #endif
+
+int pc_premium_storage_exists(map_session_data *sd, t_itemid id);
+int pc_premium_storage_count(map_session_data *sd, t_itemid id);
+void pc_check_collection_combo(map_session_data *sd, item_data *data);
+void pc_collection_combo_script(map_session_data *sd);
+TIMER_FUNC(pc_cal_status_timer);
 
 #endif /* PC_HPP */

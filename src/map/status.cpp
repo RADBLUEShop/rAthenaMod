@@ -55,6 +55,7 @@ unsigned int current_equip_combo_pos; /// For combo items we need to save the po
 int current_equip_card_id; /// To prevent card-stacking (from jA) [Skotlex]
 // We need it for new cards 15 Feb 2005, to check if the combo cards are insrerted into the CURRENT weapon only to avoid cards exploits
 short current_equip_opt_index; /// Contains random option index of an equipped item. [Secret]
+short current_collection_index;
 
 uint16 SCDisabled[SC_MAX]; ///< List of disabled SC on map zones. [Cydh]
 
@@ -3755,6 +3756,52 @@ int status_calc_pc_sub(map_session_data* sd, uint8 opt)
 		pet_delautobonus(*sd, sd->pd->autobonus, true);
 		pet_delautobonus(*sd, sd->pd->autobonus2, true);
 		pet_delautobonus(*sd, sd->pd->autobonus3, true);
+	}
+
+	// ----- ITEM COLLECTION PREMIUM -----
+	// init
+	current_collection_index = -1;
+	std::vector<t_itemid> collect_vec = {};
+	sd->collection_combos.clear();
+	bool collection_effect;
+	if(battle_config.collection_enable_bonus){
+		for (i = 0; i < battle_config.max_collection_count; i++){
+
+			current_collection_index = i;
+
+			collection_effect = collection_mode(sd);
+
+			if(sd->collectionStorage.u.items_storage[i].nameid == 0 || !collection_effect)
+				continue;
+
+			if(!item_is_collection_stack(sd->collectionStorage.u.items_storage[i].nameid)){
+				// check if the relic is already in the vector
+				if (std::find(collect_vec.begin(), collect_vec.end(), sd->collectionStorage.u.items_storage[i].nameid) != collect_vec.end() && !collect_vec.empty())
+					continue;
+				else
+					collect_vec.push_back(sd->collectionStorage.u.items_storage[i].nameid);
+			}
+
+			struct item_data *collection_info = itemdb_search(sd->collectionStorage.u.items_storage[i].nameid);
+			if (collection_info && collection_info->collection_script){
+				int maxEffect = 1;
+				if (item_is_collection_stack(sd->collectionStorage.u.items_storage[i].nameid)){
+					if(sd->collectionStorage.u.items_storage[i].amount >= collection_info->collection_stack)
+						maxEffect = collection_info->collection_stack;
+					else
+						maxEffect = sd->collectionStorage.u.items_storage[i].amount;
+				}
+
+				pc_check_collection_combo(sd, collection_info);
+				for (int j = 0; j < maxEffect; j++)
+					run_script(collection_info->collection_script, 0, sd->bl.id, 0);
+			}
+		}
+
+		if(sd->collection_combos.size()){
+			for (const auto &collection_combo : sd->collection_combos)
+				run_script(collection_combo->bonus, 0, sd->bl.id, 0);
+		}
 	}
 
 	// Parse equipment

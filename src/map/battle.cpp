@@ -11392,6 +11392,12 @@ static const struct _battle_data {
 	{ "enable_extended_vending",			&battle_config.enable_extended_vending,			0,      0,      1,              },
 	{ "extended_vending_mail",				&battle_config.extended_vending_mail,			0,      0,      1,              },
 
+	{ "collection_storage_id",				&battle_config.collection_storage_id,			1,      0,      INT_MAX,		},
+	{ "collection_enable_bonus",			&battle_config.collection_enable_bonus,			0,      0,      1,				},
+	{ "collection_bonus_mode",				&battle_config.collection_bonus_mode,			0,      0,      1|2|4,			},
+	{ "max_collection_count",				&battle_config.max_collection_count,			0,      0,      INT_MAX,		},
+	{ "collection_max_stored",				&battle_config.collection_max_stored,			1,      1,      INT_MAX,		},
+
 #include <custom/battle_config_init.inc>
 };
 

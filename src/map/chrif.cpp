@@ -306,6 +306,8 @@ int chrif_save(map_session_data *sd, int flag) {
 		storage_guild_storagesave(sd->status.account_id, sd->status.guild_id, flag);
 	if (sd->premiumStorage.dirty)
 		storage_premiumStorage_save(sd);
+	if (sd->collectionStorage.dirty)
+		storage_collectionStorage_save(sd);
 
 	if (flag&CSAVE_QUITTING)
 		sd->state.storage_flag = 0; //Force close it.

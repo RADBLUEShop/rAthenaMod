@@ -747,6 +747,12 @@ struct Battle_Config
 	int enable_extended_vending;
 	int extended_vending_mail;
 
+	int collection_storage_id;
+	int collection_enable_bonus;
+	int collection_bonus_mode;
+	int max_collection_count;
+	int collection_max_stored;
+
 #include <custom/battle_config_struct.inc>
 };
 

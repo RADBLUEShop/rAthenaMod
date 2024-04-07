@@ -3015,6 +3015,43 @@ struct s_roulette_db {
 };
 extern struct s_roulette_db rd;
 
+/// Item combo struct
+struct s_item_collection_combo {
+	std::vector<t_itemid> nameid;
+	script_code *script;
+	uint16 id;
+
+	~s_item_collection_combo() {
+		if (this->script) {
+			script_free_code(this->script);
+			this->script = nullptr;
+		}
+
+		this->nameid.clear();
+	}
+};
+
+class CollectionComboDatabase : public TypesafeYamlDatabase<uint16, s_item_collection_combo> {
+private:
+	uint16 combo_num;
+	uint16 find_combo_id( const std::vector<t_itemid>& items );
+
+public:
+	CollectionComboDatabase() : TypesafeYamlDatabase("COLLECTION_COMBO_DB", 1) {
+
+	}
+
+	void clear() override{
+		TypesafeYamlDatabase::clear();
+		this->combo_num = 0;
+	}
+	const std::string getDefaultLocation() override;
+	uint64 parseBodyNode(const ryml::NodeRef& node) override;
+	void loadingFinished() override;
+};
+
+extern CollectionComboDatabase collection_combo_db;
+
 ///Main item data struct
 struct item_data
 {
@@ -3054,6 +3091,7 @@ struct item_data
 	struct script_code *script;	//Default script for everything.
 	struct script_code *equip_script;	//Script executed once when equipping.
 	struct script_code *unequip_script;//Script executed once when unequipping.
+	struct script_code *collection_script;
 	struct {
 		unsigned available : 1;
 		uint32 no_equip;
@@ -3071,6 +3109,8 @@ struct item_data
 		bool bindOnEquip; ///< Set item as bound when equipped
 		e_item_drop_effect dropEffect; ///< Drop Effect Mode
 		unsigned gradable : 1;
+		bool collection; ///< Item can be collected
+		bool collection_stack; ///< Item can be collected and stacked
 	} flag;
 	struct {// item stacking limitation
 		uint16 amount;
@@ -3082,6 +3122,7 @@ struct item_data
 	} item_usage;
 	short gm_lv_trade_override;	//GM-level to override trade_restriction
 	std::vector<std::shared_ptr<s_item_combo>> combos;
+	std::vector<std::shared_ptr<s_item_collection_combo>> collection_combos;
 	struct {
 		uint32 duration;
 		sc_type sc; ///< Use delay group if any instead using player's item_delay data [Cydh]
@@ -3103,11 +3144,18 @@ struct item_data
 			this->unequip_script = nullptr;
 		}
 
+		if(this->collection_script){
+			script_free_code(this->collection_script);
+			this->collection_script = nullptr;
+		}
+
 		this->combos.clear();
+		this->collection_combos.clear();
 	}
 
 	bool isStackable();
 	int inventorySlotNeeded(int quantity);
+	int collection_stack;
 };
 
 class ItemDatabase : public TypesafeCachedYamlDatabase<t_itemid, item_data> {
@@ -3422,6 +3470,9 @@ struct extended_vending {
 };
 
 extern std::vector<extended_vending> extended_vending_lists;
+
+bool item_is_collection(t_itemid nameid);
+bool item_is_collection_stack(t_itemid nameid);
 
 void itemdb_reload(void);
 

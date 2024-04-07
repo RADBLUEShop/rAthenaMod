@@ -60,6 +60,7 @@
 #include "trade.hpp"
 #include "unit.hpp"
 #include "vending.hpp"
+#include "mapreg.hpp"
 
 using namespace rathena;
 
@@ -11267,6 +11268,7 @@ void clif_parse_LoadEndAck(int fd,map_session_data *sd)
 
 	pc_show_questinfo_reinit(sd);
 	pc_show_questinfo(sd);
+	storage_premiumStorage_close(sd);
 
 #if PACKETVER >= 20150513
 	if( sd->mail.inbox.unread ){
@@ -13613,6 +13615,8 @@ void clif_parse_MoveToKafra(int fd, map_session_data *sd)
 		storage_guild_storageadd(sd, item_index, item_amount);
 	else if (sd->state.storage_flag == 3)
 		storage_storageadd(sd, &sd->premiumStorage, item_index, item_amount);
+	else if (sd->state.storage_flag == 4)
+		storage_storageadd(sd, &sd->collectionStorage, item_index, item_amount);
 }
 
 
@@ -13634,6 +13638,8 @@ void clif_parse_MoveFromKafra(int fd,map_session_data *sd)
 		storage_guild_storageget(sd, item_index, item_amount);
 	else if(sd->state.storage_flag == 3)
 		storage_storageget(sd, &sd->premiumStorage, item_index, item_amount);
+	else if(sd->state.storage_flag == 4)
+		storage_storageget(sd, &sd->collectionStorage, item_index, item_amount);
 }
 
 
@@ -13665,6 +13671,8 @@ void clif_parse_MoveToKafraFromCart(int fd, map_session_data *sd){
 		storage_guild_storageaddfromcart(sd, idx, amount);
 	else if (sd->state.storage_flag == 3)
 		storage_storageaddfromcart(sd, &sd->premiumStorage, idx, amount);
+	else if (sd->state.storage_flag == 4)
+		storage_storageaddfromcart(sd, &sd->collectionStorage, idx, amount);
 }
 
 
@@ -13689,6 +13697,8 @@ void clif_parse_MoveFromKafraToCart(int fd, map_session_data *sd){
 		storage_guild_storagegettocart(sd, idx, amount);
 	else if (sd->state.storage_flag == 3)
 		storage_storagegettocart(sd, &sd->premiumStorage, idx, amount);
+	else if (sd->state.storage_flag == 4)
+		storage_storagegettocart(sd, &sd->collectionStorage, idx, amount);
 }
 
 
@@ -13701,7 +13711,7 @@ void clif_parse_CloseKafra(int fd, map_session_data *sd)
 	else
 	if( sd->state.storage_flag == 2 )
 		storage_guild_storageclose(sd);
-	else if( sd->state.storage_flag == 3 )
+	else if( sd->state.storage_flag >= 3 )
 		storage_premiumStorage_close(sd);
 }
 
@@ -20618,12 +20628,15 @@ void clif_roulette_open( map_session_data* sd ){
 void clif_parse_roulette_open( int fd, map_session_data* sd ){
 	nullpo_retv(sd);
 
-	if (!battle_config.feature_roulette) {
-		clif_messagecolor(&sd->bl,color_table[COLOR_RED],msg_txt(sd,1497),false,SELF); //Roulette is disabled
-		return;
-	}
+	struct npc_data *nd = npc_name2id(mapreg_readregstr(add_str("$@roulette_npc$")));
 
-	clif_roulette_open(sd);
+	if(nd){
+		char name[EVENT_NAME_LENGTH];
+		safesnprintf(name, ARRAYLENGTH(name), "%s::%s", nd->exname, mapreg_readregstr(add_str("$@roulette_event$")));
+		npc_event(sd,name,0);
+	}else{
+		clif_roulette_open(sd);
+	}
 }
 
 /// Sends the info about the available roulette rewards to the client

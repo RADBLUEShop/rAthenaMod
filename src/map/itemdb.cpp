@@ -747,6 +747,31 @@ uint64 ItemDatabase::parseBodyNode(const ryml::NodeRef& node) {
 			if (!exists)
 				item->flag.dropEffect = DROPEFFECT_NONE;
 		}
+
+		if (this->nodeExists(flagNode, "Collection")) {
+			bool active;
+
+			if (!this->asBool(flagNode, "Collection", active))
+				return 0;
+
+			item->flag.collection = active;
+		} else {
+			if (!exists)
+				item->flag.collection = false;
+		}
+
+		if (this->nodeExists(flagNode, "CollectionStack")) {
+			bool active;
+
+			if (!this->asBool(flagNode, "CollectionStack", active))
+				return 0;
+
+			item->flag.collection_stack = active;
+			item->flag.collection = active;
+		} else {
+			if (!exists)
+				item->flag.collection_stack = false;
+		}
 	} else {
 		if (!exists) {
 			item->flag.buyingstore = false;
@@ -758,6 +783,8 @@ uint64 ItemDatabase::parseBodyNode(const ryml::NodeRef& node) {
 			if (!(item->flag.delay_consume & DELAYCONSUME_TEMP))
 				item->flag.delay_consume = DELAYCONSUME_NONE;
 			item->flag.dropEffect = DROPEFFECT_NONE;
+			item->flag.collection = false;
+			item->flag.collection_stack = false;
 		}
 	}
 
@@ -1108,6 +1135,38 @@ uint64 ItemDatabase::parseBodyNode(const ryml::NodeRef& node) {
 	} else {
 		if (!exists)
 			item->unequip_script = nullptr;
+	}
+
+	if (this->nodeExists(node, "CollectionScript")) {
+		std::string collection_script;
+
+		if (!this->asString(node, "CollectionScript", collection_script))
+			return 0;
+
+		if (exists && item->collection_script) {
+			script_free_code(item->collection_script);
+			item->collection_script = nullptr;
+		}
+
+		item->collection_script = parse_script(collection_script.c_str(), this->getCurrentFile().c_str(), this->getLineNumber(node["CollectionScript"]), SCRIPT_IGNORE_EXTERNAL_BRACKETS);
+	} else {
+		if (!exists)
+			item->collection_script = nullptr;
+	}
+
+	if (this->nodeExists(node, "CollectionEffectStack")){
+		uint32 stack;
+
+		if(!this->asUInt32(node, "CollectionEffectStack", stack))
+			return 0;
+
+		if(stack < 1){
+			this->invalidWarning(node["CollectionEffectStack"], "item %d CollectionEffectStack cannot go gelow 1 , defaulting to 1.\n", item->nameid);
+			stack = 1;
+		}
+		item->collection_stack = stack;
+	}else{
+		item->collection_stack = 1;
 	}
 
 	if (!exists)
@@ -4700,6 +4759,193 @@ bool RandomOptionGroupDatabase::option_get_id(std::string name, uint16 &id) {
 	return false;
 }
 
+/*==========================================
+ * look through item db and return collection flag
+ *------------------------------------------*/
+bool item_is_collection(t_itemid nameid) {
+	std::shared_ptr<item_data> id;
+
+	if (!(id = item_db.find(nameid))) {
+		ShowWarning("item_is_collection: Item ID %u does not exists in the item_db. Using dummy data.\n", nameid);
+		// crash protection
+		return false;
+	}
+
+	return id->flag.collection;
+}
+
+/*==========================================
+ * look through item db and return collectionStack flag
+ *------------------------------------------*/
+bool item_is_collection_stack(t_itemid nameid) {
+	std::shared_ptr<item_data> id;
+
+	if (!(id = item_db.find(nameid))) {
+		ShowWarning("item_is_collection_stack: Item ID %u does not exists in the item_db. Using dummy data.\n", nameid);
+		// crash protection
+		return false;
+	}
+
+	return id->flag.collection_stack;
+}
+
+const std::string CollectionComboDatabase::getDefaultLocation() {
+	return std::string(db_path) + "/custom/collection_combos.yml";
+}
+
+uint16 CollectionComboDatabase::find_combo_id( const std::vector<t_itemid>& items ){
+	for (const auto &it : *this) {
+		if (it.second->nameid == items) {
+			return it.first;
+		}
+	}
+
+	return 0;
+}
+
+/**
+ * Reads and parses an entry from the item_combos.
+ * @param node: YAML node containing the entry.
+ * @return count of successfully parsed rows
+ */
+uint64 CollectionComboDatabase::parseBodyNode(const ryml::NodeRef& node) {
+	std::vector<std::vector<t_itemid>> items_list;
+
+	if( !this->nodesExist( node, { "Combos" } ) ){
+		return 0;
+	}
+
+	const ryml::NodeRef& combosNode = node["Combos"];
+
+	for (const auto& comboit : combosNode) {
+		static const std::string nodeName = "Combo";
+
+		if (!this->nodesExist(comboit, { nodeName })) {
+			return 0;
+		}
+
+		const ryml::NodeRef& comboNode = comboit["Combo"];
+
+		if (!comboNode.is_seq()) {
+			this->invalidWarning(comboNode, "%s should be a sequence.\n", nodeName.c_str());
+			return 0;
+		}
+
+		std::vector<t_itemid> items = {};
+
+		for (const auto it : comboNode) {
+			std::string item_name;
+			c4::from_chars(it.val(), &item_name);
+
+			std::shared_ptr<item_data> item = item_db.search_aegisname(item_name.c_str());
+
+			if (item == nullptr) {
+				this->invalidWarning(it, "Invalid item %s, skipping.\n", item_name.c_str());
+				return 0;
+			}
+
+			items.push_back(item->nameid);
+		}
+
+		if (items.empty()) {
+			this->invalidWarning(comboNode, "Empty combo, skipping.\n");
+			return 0;
+		}
+
+		if (items.size() < 2) {
+			this->invalidWarning(comboNode, "Not enough item to make a combo (need at least 2). Skipping.\n");
+			return 0;
+		}
+
+		std::sort(items.begin(), items.end());
+		items_list.push_back(items);
+	}
+
+	if (items_list.empty()) {
+		this->invalidWarning(combosNode, "No combos defined, skipping.\n");
+		return 0;
+	}
+
+	if (this->nodeExists(node, "Clear")) {
+		bool clear = false;
+
+		if (!this->asBool(node, "Clear", clear))
+			return 0;
+
+		// Remove the combo (if exists)
+		if (clear) {
+			for (const auto& itemsit : items_list) {
+				uint16 id = this->find_combo_id(itemsit);
+
+				if (id == 0) {
+					this->invalidWarning(node["Clear"], "Unable to clear the combo.\n");
+					return 0;
+				}
+
+				this->erase(id);
+			}
+
+			return 1;
+		}
+	}
+
+	uint64 count = 0;
+
+	for (const auto &itemsit : items_list) {
+		// Find the id when the combo exists
+		uint16 id = this->find_combo_id(itemsit);
+		std::shared_ptr<s_item_collection_combo> col_combo = this->find(id);
+		bool exists = col_combo != nullptr;
+
+		if (!exists) {
+			col_combo = std::make_shared<s_item_collection_combo>();
+
+			col_combo->nameid.insert(col_combo->nameid.begin(), itemsit.begin(), itemsit.end());
+			col_combo->id = ++this->combo_num;
+		}
+
+		if (this->nodeExists(node, "Script")) {
+			std::string script;
+
+			if (!this->asString(node, "Script", script))
+				return 0;
+
+			if (exists) {
+				script_free_code(col_combo->script);
+				col_combo->script = nullptr;
+			}
+			col_combo->script = parse_script(script.c_str(), this->getCurrentFile().c_str(), this->getLineNumber(node["Script"]), SCRIPT_IGNORE_EXTERNAL_BRACKETS);
+		} else {
+			if (!exists) {
+				col_combo->script = nullptr;
+			}
+		}
+
+		if (!exists)
+			this->put( col_combo->id, col_combo );
+
+		count++;
+	}
+
+	return count;
+}
+
+CollectionComboDatabase collection_combo_db;
+
+void CollectionComboDatabase::loadingFinished() {
+	// Populate item_data to refer to the combo
+	for (const auto &combo : *this) {
+		for (const auto &itm : combo.second->nameid) {
+			std::shared_ptr<item_data> it = item_db.find(itm);
+
+			if (it != nullptr)
+				it->collection_combos.push_back(combo.second);
+		}
+	}
+
+	TypesafeYamlDatabase::loadingFinished();
+}
+
 /**
 * Read all item-related databases
 */
@@ -4747,6 +4993,7 @@ static void itemdb_read(void) {
 	item_reform_db.load();
 	item_enchant_db.load();
 	item_package_db.load();
+	collection_combo_db.load();
 
 	if (battle_config.feature_roulette)
 		itemdb_parse_roulette_db();
@@ -4820,6 +5067,7 @@ void itemdb_reload(void) {
 	for( sd = (map_session_data*)mapit_first(iter); mapit_exists(iter); sd = (map_session_data*)mapit_next(iter) ) {
 		memset(sd->item_delay, 0, sizeof(sd->item_delay));  // reset item delays
 		sd->combos.clear(); // clear combo bonuses
+		sd->collection_combos.clear(); // clear collection combo bonuses
 		pc_setinventorydata(sd);
 		pc_check_available_item(sd, ITMCHK_ALL); // Check for invalid(ated) items.
 		pc_load_combo(sd); // Check to see if new combos are available
@@ -4842,6 +5090,7 @@ void do_final_itemdb(void) {
 	item_reform_db.clear();
 	item_enchant_db.clear();
 	item_package_db.clear();
+	collection_combo_db.clear();
 	if (battle_config.feature_roulette)
 		itemdb_roulette_free();
 

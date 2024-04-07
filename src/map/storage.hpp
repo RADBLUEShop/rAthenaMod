@@ -92,4 +92,8 @@ void storage_premiumStorage_quit(map_session_data *sd);
 
 int compare_item(struct item *a, struct item *b);
 
+void storage_collectionStorage_open(map_session_data *sd);
+void storage_collectionStorage_save(map_session_data *sd);
+bool storage_collectionStorage_load(map_session_data *sd, uint8 num, uint8 mode);
+
 #endif /* STORAGE_HPP */
