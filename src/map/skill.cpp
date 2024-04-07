@@ -9322,9 +9322,16 @@ int skill_castend_nodamage_id (struct block_list *src, struct block_list *bl, ui
 					intif_storage_save(sd, &sd->cart);
 				}
 				else{
-					// Instantly open the vending UI
-					sd->state.pending_vending_ui = false;
-					clif_openvendingreq(sd,2+skill_lv);
+					if(battle_config.enable_extended_vending){
+						sd->state.open_extended_vending = true;
+						sd->state.pending_vending_ui = false;
+						clif_arrow_create_list(sd);
+						break;
+					}else if (!battle_config.enable_extended_vending) {
+						// Instantly open the vending UI
+						sd->state.pending_vending_ui = false;
+						clif_openvendingreq(sd,2+skill_lv);
+					}
 				}
 			}
 		}

@@ -11389,6 +11389,9 @@ static const struct _battle_data {
 	{ "feature.instance_allow_reconnect",   &battle_config.instance_allow_reconnect,        0,      0,      1,              },
 #endif
 
+	{ "enable_extended_vending",			&battle_config.enable_extended_vending,			0,      0,      1,              },
+	{ "extended_vending_mail",				&battle_config.extended_vending_mail,			0,      0,      1,              },
+
 #include <custom/battle_config_init.inc>
 };
 

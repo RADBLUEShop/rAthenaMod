@@ -89,3 +89,16 @@ Header:
   Version: 3
 
 Body:
+  - Id: 81001
+    AegisName: Vending_Zeny
+    Name: Zeny
+    Type: Etc
+    Buy: 1
+    Weight: 1
+
+  - Id: 81002
+    AegisName: Vending_Cash
+    Name: Cash
+    Type: Etc
+    Buy: 1
+    Weight: 1

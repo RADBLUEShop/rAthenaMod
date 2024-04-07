@@ -744,6 +744,9 @@ struct Battle_Config
 	int feature_banking_state_enforce;
 	int instance_allow_reconnect;
 
+	int enable_extended_vending;
+	int extended_vending_mail;
+
 #include <custom/battle_config_struct.inc>
 };
 

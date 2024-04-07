@@ -455,6 +455,8 @@ public:
 		bool roulette_open;
 		t_itemid item_reform;
 		uint64 item_enchant_index;
+		bool open_extended_vending;
+		t_itemid vending_item;
 	} state;
 	struct {
 		unsigned char no_weapon_damage, no_magic_damage, no_misc_damage;

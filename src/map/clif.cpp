@@ -4205,29 +4205,42 @@ void clif_arrow_create_list( map_session_data *sd ){
 
 	int count = 0;
 
-	for (const auto &it : skill_arrow_db) {
-		t_itemid nameid = it.second->nameid;
+	if(sd->state.open_extended_vending){
+		for (const auto &it : extended_vending_lists) {
+			t_itemid nameid = it.nameid;
 
-		if( !item_db.exists( nameid ) ){
-			continue;
+			if( !item_db.exists( nameid ) ){
+				continue;
+			}
+
+			p->items[count].itemId = client_nameid( nameid );
+			count++;
 		}
+	}else{
+		for (const auto &it : skill_arrow_db) {
+			t_itemid nameid = it.second->nameid;
 
-		int index = pc_search_inventory( sd, nameid );
+			if( !item_db.exists( nameid ) ){
+				continue;
+			}
 
-		if( index < 0 ){
-			continue;
+			int index = pc_search_inventory( sd, nameid );
+
+			if( index < 0 ){
+				continue;
+			}
+
+			if( sd->inventory.u.items_inventory[index].equip ){
+				continue;
+			}
+
+			if( !sd->inventory.u.items_inventory[index].identify ){
+				continue;
+			}
+
+			p->items[count].itemId = client_nameid( nameid );
+			count++;
 		}
-
-		if( sd->inventory.u.items_inventory[index].equip ){
-			continue;
-		}
-
-		if( !sd->inventory.u.items_inventory[index].identify ){
-			continue;
-		}
-
-		p->items[count].itemId = client_nameid( nameid );
-		count++;
 	}
 
 	p->packetLength = sizeof( struct PACKET_ZC_MAKINGARROW_LIST ) + count * sizeof( struct PACKET_ZC_MAKINGARROW_LIST_sub );
@@ -4235,7 +4248,10 @@ void clif_arrow_create_list( map_session_data *sd ){
 	clif_send( p, p->packetLength, &sd->bl, SELF );
 
 	if( count > 0 ){
-		sd->menuskill_id = AC_MAKINGARROW;
+		if (sd->state.open_extended_vending)
+			sd->menuskill_id = MC_VENDING;
+		else
+			sd->menuskill_id = AC_MAKINGARROW;
 		sd->menuskill_val = count;
 	}
 }
@@ -7687,6 +7703,13 @@ void clif_openvendingreq(map_session_data* sd, int num)
 	int fd;
 
 	nullpo_retv(sd);
+
+	if(battle_config.enable_extended_vending && sd->state.open_extended_vending == false){
+		sd->state.prevend = 0;
+		sd->state.workinprogress = WIP_DISABLE_NONE;
+		sd->state.pending_vending_ui = false;
+		return;
+	}
 
 	fd = sd->fd;
 	WFIFOHEAD(fd,packet_len(0x12d));
@@ -13448,6 +13471,15 @@ void clif_parse_SelectArrow(int fd,map_session_data *sd) {
 
 	struct PACKET_CZ_REQ_MAKINGARROW* p = (struct PACKET_CZ_REQ_MAKINGARROW*)RFIFOP( fd, 0 );
 
+	if(sd->state.open_extended_vending && p->itemId == (uint32)(0xFFFFFFFF)){
+		sd->state.open_extended_vending = false;
+		sd->state.pending_vending_ui = false;
+		sd->state.prevend = 0;
+		sd->state.workinprogress = WIP_DISABLE_NONE;
+		clif_menuskill_clear(sd);
+		return;
+	}
+
 	switch (sd->menuskill_id) {
 		case AC_MAKINGARROW:
 			skill_arrow_create(sd,p->itemId);
@@ -13460,6 +13492,10 @@ void clif_parse_SelectArrow(int fd,map_session_data *sd) {
 			break;
 		case NC_MAGICDECOY:
 			skill_magicdecoy(sd,p->itemId);
+			break;
+		case MC_VENDING:
+			sd->state.vending_item = p->itemId;
+			clif_openvendingreq(sd,2+ sd->vend_skill_lv);
 			break;
 	}
 
@@ -14169,7 +14205,15 @@ void clif_parse_OpenVending(int fd, map_session_data* sd){
 	if( message[0] == '\0' ) // invalid input
 		return;
 
-	vending_openvending(sd, message, data, len/8, NULL);
+	if(sd->state.open_extended_vending){
+		std::shared_ptr<item_data> id = item_db.find(sd->state.vending_item);
+		std::string shop_type = "";
+
+		shop_type = "[" + id->ename + "] " + message;
+		vending_openvending(sd, shop_type.c_str(), data, len/8, NULL);
+	}else{
+		vending_openvending(sd, message, data, len/8, NULL);
+	}
 }
 
 
