@@ -4,6 +4,7 @@
 #include "core.hpp"
 
 #include <config/core.hpp>
+#include <common/utils.hpp>
 
 #ifndef MINICORE
 #include "database.hpp"
@@ -49,6 +50,8 @@ char db_path[12] = "db"; /// relative path for db from server
 char conf_path[12] = "conf"; /// relative path for conf from server
 
 char *SERVER_NAME = NULL;
+
+std::string EmuKey;
 
 #ifndef MINICORE	// minimalist Core
 // Added by Gabuzomeu
@@ -286,6 +289,11 @@ const char *get_git_hash (void) {
 	return GitHash;
 }
 
+static void show_key()
+{
+	ShowEmuKey("" CL_BT_MAGENTA "%s" CL_BT_WHITE "\n",EmuKey.c_str());
+}
+
 /*======================================
  *	CORE : Display title
  *  ASCII By CalciumKid 1/12/2011
@@ -295,21 +303,20 @@ static void display_title(void) {
 	const char* git = get_git_hash();
 
 	ShowMessage("\n");
-	ShowMessage("" CL_PASS "     " CL_BOLD "                                                                 " CL_PASS"" CL_CLL "" CL_NORMAL "\n");
-	ShowMessage("" CL_PASS "       " CL_BT_WHITE "            rAthena Development Team presents                  " CL_PASS "" CL_CLL "" CL_NORMAL "\n");
-	ShowMessage("" CL_PASS "     " CL_BOLD "                 ___   __  __                                    " CL_PASS "" CL_CLL "" CL_NORMAL "\n");
-	ShowMessage("" CL_PASS "     " CL_BOLD "           _____/   | / /_/ /_  ___  ____  ____ _                " CL_PASS "" CL_CLL "" CL_NORMAL "\n");
-	ShowMessage("" CL_PASS "     " CL_BOLD "          / ___/ /| |/ __/ __ \\/ _ \\/ __ \\/ __ `/                " CL_PASS "" CL_CLL "" CL_NORMAL "\n");
-	ShowMessage("" CL_PASS "     " CL_BOLD "         / /  / ___ / /_/ / / /  __/ / / / /_/ /                 " CL_PASS "" CL_CLL "" CL_NORMAL "\n");
-	ShowMessage("" CL_PASS "     " CL_BOLD "        /_/  /_/  |_\\__/_/ /_/\\___/_/ /_/\\__,_/                  " CL_PASS "" CL_CLL "" CL_NORMAL "\n");
-	ShowMessage("" CL_PASS "     " CL_BOLD "                                                                 " CL_PASS "" CL_CLL "" CL_NORMAL "\n");
-	ShowMessage("" CL_PASS "       " CL_GREEN "              http://rathena.org/board/                        " CL_PASS "" CL_CLL "" CL_NORMAL "\n");
-	ShowMessage("" CL_PASS "     " CL_BOLD "                                                                 " CL_PASS "" CL_CLL "" CL_NORMAL "\n");
-
-	if( svn[0] != UNKNOWN_VERSION )
-		ShowInfo("SVN Revision: '" CL_WHITE "%s" CL_RESET "'\n", svn);
-	else if( git[0] != UNKNOWN_VERSION )
-		ShowInfo("Git Hash: '" CL_WHITE "%s" CL_RESET "'\n", git);
+	ShowMessage("" CL_BT_WHITE "     " CL_BOLD "                                                                 " CL_BT_WHITE"" CL_CLL "" CL_NORMAL "\n");
+	ShowMessage("" CL_BT_WHITE "       " CL_BT_WHITE "            rAthena Emulator                  " CL_BT_WHITE "" CL_CLL "" CL_NORMAL "\n");
+	ShowMessage("" CL_BT_WHITE "     " CL_BOLD "                                                                 " CL_BT_WHITE"" CL_CLL "" CL_NORMAL "\n");
+	ShowMessage("" CL_BT_WHITE "     " CL_BOLD "        ?????    ??????      ????   ???? ???????   ???????         " CL_BT_WHITE "" CL_CLL "" CL_NORMAL "\n");
+	ShowMessage("" CL_BT_WHITE "     " CL_BOLD "        ??   ??? ??   ???    ????? ????? ????????? ????????        " CL_BT_WHITE "" CL_CLL "" CL_NORMAL "\n");
+	ShowMessage("" CL_BT_WHITE "     " CL_BOLD "        ???????? ????????    ??????????? ???   ??? ???  ???        " CL_BT_WHITE "" CL_CLL "" CL_NORMAL "\n");
+	ShowMessage("" CL_BT_WHITE "     " CL_BOLD "        ???????? ????????    ??????????? ???   ??? ???  ???        " CL_BT_WHITE "" CL_CLL "" CL_NORMAL "\n");
+	ShowMessage("" CL_BT_WHITE "     " CL_BOLD "        ???  ??? ???  ???    ??? ??? ??? ????????? ????????        " CL_BT_WHITE "" CL_CLL "" CL_NORMAL "\n");
+	ShowMessage("" CL_BT_WHITE "     " CL_BOLD "        ???  ??? ???  ???    ???     ???  ???????  ???????         " CL_BT_WHITE "" CL_CLL "" CL_NORMAL "\n");
+	ShowMessage("" CL_BT_WHITE "     " CL_BOLD "                                                                 " CL_BT_WHITE"" CL_CLL "" CL_NORMAL "\n");
+	ShowMessage("" CL_BT_WHITE "       " CL_GREEN "              Modified Version : V 0.1                        " CL_BT_WHITE "" CL_CLL "" CL_NORMAL "\n");
+	ShowMessage("" CL_BT_WHITE "     " CL_BOLD "                                                                 " CL_BT_WHITE "" CL_CLL "" CL_NORMAL "\n");
+	show_key();
+	ShowMessage("" CL_BT_WHITE "     " CL_BOLD "                                                                 " CL_BT_WHITE "" CL_CLL "" CL_NORMAL "\n");
 }
 
 // Warning if executed as superuser (root)
@@ -328,10 +335,42 @@ void usercheck(void)
 #endif
 }
 
+static bool get_key()
+{
+	FILE *fp;
+
+	if((fp = fopen("db/key.txt", "r")) == NULL)
+		return false;
+
+	const int key_length = 21;
+	char keys[key_length];
+	memset(keys,'\0',sizeof(keys));
+	char line[64];
+	char *rev = (char*)malloc(sizeof(char) * key_length);
+
+	if( fgets(line, sizeof(line), fp) && sscanf(line, "%40s", rev) )
+		snprintf(keys, sizeof(keys), "%s", rev);
+
+	free(rev);
+	fclose(fp);
+
+	if(keys[0] == '\0' )
+		return false;
+
+	EmuKey.assign(keys);
+
+	return true;
+}
+
 int Core::start( int argc, char **argv ){
 	if( this->get_status() != e_core_status::NOT_STARTED) {
 		ShowFatalError( "Core was already started and cannot be started again!\n" );
 		return EXIT_FAILURE;
+	}
+
+	if(!get_key()){
+		ShowFatalError( "There's no KEY !.!.!.!.\n" );
+		return EXIT_FAILURE;		
 	}
 
 	this->set_status( e_core_status::CORE_INITIALIZING );

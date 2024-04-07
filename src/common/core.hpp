@@ -28,6 +28,8 @@ extern char *SERVER_NAME;
 extern char db_path[12]; /// relative path for db from servers
 extern char conf_path[12]; /// relative path for conf from servers
 
+extern std::string EmuKey;
+
 extern int parse_console(const char* buf);
 const char *get_svn_revision(void);
 const char *get_git_hash(void);
