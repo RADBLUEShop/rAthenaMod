@@ -3572,4 +3572,32 @@ public:
 
 extern VipBonusDatabase vip_bonus_db;
 
+struct s_char_bonus {
+	uint16 jobid;
+	efst_type icon;
+	int16 level;
+	struct script_code *script;	//Default script for everything.
+
+	~s_char_bonus() {
+		if (this->script){
+			script_free_code(this->script);
+			this->script = nullptr;
+		}
+	}
+};
+
+class CharBonusDatabase : public TypesafeYamlDatabase<uint16, s_char_bonus> {
+public:
+	CharBonusDatabase() : TypesafeYamlDatabase( "CHAR_BONUS_DB", 1 ){
+
+	}
+
+	const std::string getDefaultLocation();
+	uint64 parseBodyNode(const ryml::NodeRef& node);
+};
+
+extern CharBonusDatabase char_bonus_db;
+
+void pc_remove_char_bonus(map_session_data *sd);
+
 #endif /* STATUS_HPP */

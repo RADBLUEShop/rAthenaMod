@@ -3829,6 +3829,31 @@ int status_calc_pc_sub(map_session_data* sd, uint8 opt)
 			}
 	}
 
+	std::vector<int> char_jobid = {};
+	if(sd->char_bonus.size()){
+		for(const auto &char_data : sd->char_bonus) {
+			for(const auto &bonus : char_bonus_db) {
+				if(bonus.second->jobid == char_data.jobid && char_data.level >= bonus.second->level) {
+					clif_status_load(&sd->bl, bonus.second->icon, 0);
+
+					if(util::vector_exists(char_jobid, bonus.second->jobid))
+						continue;
+
+					if(bonus.second->icon != EFST_BLANK)
+						clif_status_load(&sd->bl, bonus.second->icon, 1);
+
+					char_jobid.push_back(bonus.second->jobid);
+
+					if(bonus.second->script){
+						run_script(bonus.second->script, 0, sd->bl.id,0);
+						if (!calculating)
+							return 1;
+					}
+				}
+			}
+		}
+	}
+
 	vip_bonus(sd);
 
 	// Parse equipment
@@ -16295,13 +16320,126 @@ uint64 VipBonusDatabase::parseBodyNode(const ryml::NodeRef& node) {
 
 VipBonusDatabase vip_bonus_db;
 
-static void apply_vip_bouns()
+const std::string CharBonusDatabase::getDefaultLocation() {
+	return std::string(db_path) + "/custom/char_bonus.yml";
+}
+
+/**
+ * Reads and parses an entry from the char_bonus.
+ * @param node: YAML node containing the entry.
+ * @return count of successfully parsed rows
+ */
+uint64 CharBonusDatabase::parseBodyNode(const ryml::NodeRef &node){
+
+	if (!this->nodesExist(node, {"Job","LevelNeed","BonusScript"}))
+		return 0;
+
+	std::string jobname;
+
+	if (!this->asString(node, "Job", jobname))
+		return 0;
+
+	int64 constant;
+
+	if( !script_get_constant(( "JOB_"+jobname).c_str(),&constant)){
+		this->invalidWarning( node["Job"], "Unknown \"%s\" Job.\n",jobname.c_str());
+		return 0;
+	}
+
+	std::shared_ptr<s_char_bonus> char_bonus = this->find(constant);
+	bool exists = char_bonus != nullptr;
+
+	if (!exists) {
+
+		if (!this->nodesExist(node, {"Job"}))
+			return 0;
+
+		char_bonus = std::make_shared<s_char_bonus>();
+		char_bonus->jobid = constant;
+	}
+
+	if (this->nodeExists(node, "LevelNeed")) {
+		int16 level;
+
+		if (!this->asInt16(node, "LevelNeed", level))
+			return 0;
+
+		if(level < 0 || level > MAX_LEVEL){
+			this->invalidWarning(node["LevelNeed"], "LevelNeed %d is out of bounds.\n", level);
+			return 0;
+		}
+
+		char_bonus->level = level;
+	}else{
+		char_bonus->level = 0;
+	}
+
+	if (this->nodeExists(node, "Icon")) {
+		std::string icon_name;
+
+		if (!this->asString(node, "Icon", icon_name))
+			return 0;
+
+		int64 constant;
+
+		if (!script_get_constant(icon_name.c_str(), &constant)) {
+			this->invalidWarning(node["Icon"], "Icon %s is invalid, defaulting to EFST_BLANK.\n", icon_name.c_str());
+			constant = EFST_BLANK;
+		}
+
+		if (constant < EFST_BLANK || constant >= EFST_MAX) {
+			this->invalidWarning(node["Icon"], "Icon %s is out of bounds, defaulting to EFST_BLANK.\n", icon_name.c_str());
+			constant = EFST_BLANK;
+		}
+
+		char_bonus->icon = static_cast<efst_type>(constant);
+	} else {
+		if (!exists)
+			char_bonus->icon = EFST_BLANK;
+	}
+
+	if (this->nodeExists(node, "BonusScript")) {
+		std::string script;
+
+		if (!this->asString(node, "BonusScript", script))
+			return 0;
+
+		if (char_bonus->script) {
+			script_free_code(char_bonus->script);
+			char_bonus->script = nullptr;
+		}
+
+		char_bonus->script = parse_script(script.c_str(), this->getCurrentFile().c_str(), this->getLineNumber(node["BonusScript"]), SCRIPT_IGNORE_EXTERNAL_BRACKETS);
+	} else {
+		if (!exists)
+			char_bonus->script = nullptr;
+	}
+
+	if (!exists) {
+		this->put(char_bonus->jobid, char_bonus);
+	}
+
+	return 1;
+}
+
+CharBonusDatabase char_bonus_db;
+
+void pc_remove_char_bonus(map_session_data *sd)
+{
+	nullpo_retv(sd);
+	for(const auto &bonus : char_bonus_db) {
+		clif_status_load(&sd->bl, bonus.second->icon, 0);
+	}
+}
+
+static void apply_custom_bonus()
 {
 	struct s_mapiterator* iter;
 	map_session_data* sd;
 
 	iter = mapit_geteachpc();
 	for (sd = (map_session_data*)mapit_first(iter); mapit_exists(iter); sd = (map_session_data*)mapit_next(iter)) {
+		pc_remove_char_bonus(sd);
 		status_calc_pc(sd, SCO_NONE);
 	}
 
@@ -16355,6 +16493,7 @@ void status_readdb( bool reload ){
 		status_db.reload();
 		enchantgrade_db.reload();
 		no_equip_db.reload();
+		char_bonus_db.reload();
 		vip_bonus_db.reload();
 	}else{
 		size_fix_db.load();
@@ -16362,10 +16501,11 @@ void status_readdb( bool reload ){
 		status_db.load();
 		enchantgrade_db.load();
 		no_equip_db.load();
+		char_bonus_db.load();
 		vip_bonus_db.load();
 	}
 	elemental_attribute_db.load();
-	apply_vip_bouns();
+	apply_custom_bonus();
 }
 
 /**

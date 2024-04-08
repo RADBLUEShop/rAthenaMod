@@ -379,6 +379,11 @@ struct s_collection_combos {
 	uint32 id;
 };
 
+struct s_char_data {
+	int16 jobid;
+	int16 level;
+};
+
 class map_session_data {
 public:
 	struct block_list bl;
@@ -496,6 +501,8 @@ public:
 	struct s_storage inventory;
 	struct s_storage cart;
 	struct s_storage collectionStorage;
+
+	std::vector<s_char_data> char_bonus;
 
 	struct item_data* inventory_data[MAX_INVENTORY]; // direct pointers to itemdb entries (faster than doing item_id lookups)
 	short equip_index[EQI_MAX];

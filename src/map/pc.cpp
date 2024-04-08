@@ -2288,6 +2288,31 @@ bool pc_set_hate_mob(map_session_data *sd, int pos, struct block_list *bl)
 	return true;
 }
 
+void load_char_bonus_data(map_session_data &sd) {
+
+    sd.char_bonus.clear();
+    struct s_char_data char_data = {};
+
+    SqlStmt *sql_data = SqlStmt_Malloc(mmysql_handle);
+
+    if (SQL_ERROR == SqlStmt_Prepare(sql_data, "SELECT `class`,`base_level` FROM `char` WHERE `account_id`= %d", sd.status.account_id) || SqlStmt_Execute(sql_data)) {
+        SqlStmt_ShowDebug(sql_data);
+        SqlStmt_Free(sql_data);
+        return;
+    }
+
+    SqlStmt_BindColumn(sql_data, 0, SQLDT_INT, &char_data.jobid, 0, NULL, NULL);
+    SqlStmt_BindColumn(sql_data, 1, SQLDT_INT, &char_data.level, 0, NULL, NULL);
+
+    int count = SqlStmt_NumRows(sql_data);
+
+    for(int i = 0; i < count && SQL_SUCCESS == SqlStmt_NextRow(sql_data); i++) {
+        sd.char_bonus.push_back(char_data);
+    }
+
+    SqlStmt_Free(sql_data);
+}
+
 /*==========================================
  * Invoked once after the char/account/account2 registry variables are received. [Skotlex]
  * We didn't receive item information at this point so DO NOT attempt to do item operations here.
@@ -2377,6 +2402,8 @@ void pc_reg_received(map_session_data *sd)
 	intif_storage_request(sd,TABLE_STORAGE, battle_config.collection_storage_id, STOR_MODE_ALL); // Request storage data
 	intif_storage_request(sd,TABLE_CART, 0, STOR_MODE_ALL); // Request cart data
 	intif_storage_request(sd,TABLE_INVENTORY, 0, STOR_MODE_ALL); // Request inventory data
+
+	load_char_bonus_data(*sd); // Load bonus data
 
 	// Restore IM_CHAR instance to the player
 	for (const auto &instance : instances) {

@@ -1,2 +1,15 @@
 Commit : https://github.com/rathena/rathena/commit/8cec8ce5605ac7933b40771cba51425ba64e3e43
 Name : Minor trap damage fixes (#8230) 
+
+-- SRC --
+- Extended vending
+- Collection
+- Limitedsale
+- Charm / Charm Upgrade (ตีบวก)
+- Vip + Vip Bonus (SRC)
+- Emote Fix (สำหรับ Client 202305+)
+- Character Bonus (Char Pass)
+
+-- FIX --
+- DEF negative
+- ASPD
