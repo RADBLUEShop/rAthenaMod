@@ -463,6 +463,7 @@ public:
 		bool open_extended_vending;
 		t_itemid vending_item;
 		bool collection_open;
+		bool recal_vip_time;
 	} state;
 	struct {
 		unsigned char no_weapon_damage, no_magic_damage, no_misc_damage;
@@ -958,6 +959,8 @@ public:
 	s_macro_detect macro_detect;
 
 	std::vector<uint32> party_booking_requests;
+
+	int vip_timer_tid;
 };
 
 extern struct eri *pc_sc_display_ers; /// Player's SC display table
@@ -1765,6 +1768,8 @@ void pc_macro_detector_disconnect(map_session_data &sd);
 void pc_macro_reporter_area_select(map_session_data &sd, const int16 x, const int16 y, const int8 radius);
 void pc_macro_reporter_process(map_session_data &sd, int32 reporter_account_id = -1);
 
+void pc_check_equip_allow(map_session_data *sd);
+
 #ifdef MAP_GENERATOR
 void pc_reputation_generate();
 #endif
@@ -1774,5 +1779,10 @@ int pc_premium_storage_count(map_session_data *sd, t_itemid id);
 void pc_check_collection_combo(map_session_data *sd, item_data *data);
 void pc_collection_combo_script(map_session_data *sd);
 TIMER_FUNC(pc_cal_status_timer);
+
+void vip_bonus(map_session_data *sd);
+void clean_vip_bonus(map_session_data *sd);
+TIMER_FUNC(vip_bonus_timer);
+TIMER_FUNC(vip_delete_timer);
 
 #endif /* PC_HPP */

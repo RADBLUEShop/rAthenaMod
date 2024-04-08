@@ -517,7 +517,7 @@ int mapif_parse_CreateParty(int fd, char *name, int item, int item2, struct part
 		for( int i = 0; i < NAME_LENGTH && name[i]; i++ ){
 			if (strchr(charserv_config.char_config.char_name_letters, name[i]) == NULL) {
 				if( name[i] == '"' ) { /* client-special-char */
-					normalize_name(name,"\"");
+					// normalize_name(name,"\"");
 					mapif_parse_CreateParty(fd,name,item,item2,leader);
 					return 0;
 				}

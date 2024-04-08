@@ -440,6 +440,47 @@ struct PACKET_ZC_INVENTORY_TAB{
 	bool favorite;
 } __attribute__((packed));
 
+struct PACKET_CZ_REQ_EMOTION_EXPANSION {
+	int16 packetType;
+	uint16 packId;
+	uint16 emotionId;
+} __attribute__((packed));
+
+struct PACKET_CZ_REQ_BUY_EMOTION_EXPANSION {
+	int16 packetType;
+	uint16 packId;
+	uint16 currencyItemId;
+	uint8 currencyAmount;
+} __attribute__((packed));
+
+struct PACKET_ZC_ACK_EMOTION_EXPANSION {
+	int16 packetType;
+	uint32 AID;
+	uint16 packId;
+	uint16 emotionId;
+} __attribute__((packed));
+
+struct PACKET_ZC_FAIL_EMOTION_EXPANSION {
+	int16 packetType;
+	char unknown[5];
+} __attribute__((packed));
+
+struct PACKET_ZC_ACK_BUY_EMOTION_EXPANSION {
+	int16 packetType;
+	char unknown[7];
+} __attribute__((packed));
+
+struct PACKET_ZC_FAIL_BUY_EMOTION_EXPANSION {
+	int16 packetType;
+	char unknown[3];
+} __attribute__((packed));
+
+struct PACKET_ZC_BUY_EMOTION_EXPANSION_LIST {
+	int16 packetType;
+	int16 packetLength;
+	char unknown_fixed[4];
+};
+
 // NetBSD 5 and Solaris don't like pragma pack but accept the packed attribute
 #if !defined( sun ) && ( !defined( __NETBSD__ ) || __NetBSD_Version__ >= 600000000 )
 	#pragma pack( pop )
@@ -528,6 +569,12 @@ DEFINE_PACKET_HEADER(ZC_REPUTE_INFO, 0x0b8d)
 DEFINE_PACKET_HEADER(ZC_UI_OPEN_V3, 0x0b9a)
 DEFINE_PACKET_HEADER(CZ_RESET_SKILL, 0x0bb1)
 DEFINE_PACKET_HEADER(CZ_PC_SELL_ITEMLIST, 0x00c9)
+DEFINE_PACKET_HEADER(CZ_REQ_EMOTION_EXPANSION, 0x0be9)
+DEFINE_PACKET_HEADER(ZC_ACK_EMOTION_EXPANSION, 0x0bea)
+DEFINE_PACKET_HEADER(ZC_FAIL_EMOTION_EXPANSION, 0x0beb)
+DEFINE_PACKET_HEADER(CZ_REQ_BUY_EMOTION_EXPANSION, 0x0bec)
+DEFINE_PACKET_HEADER(ZC_FAIL_BUY_EMOTION_EXPANSION, 0xbed)
+DEFINE_PACKET_HEADER(ZC_BUY_EMOTION_EXPANSION_LIST, 0xbee)
 
 const int16 MAX_INVENTORY_ITEM_PACKET_NORMAL = ( ( INT16_MAX - ( sizeof( struct packet_itemlist_normal ) - ( sizeof( struct NORMALITEM_INFO ) * MAX_ITEMLIST) ) ) / sizeof( struct NORMALITEM_INFO ) );
 const int16 MAX_INVENTORY_ITEM_PACKET_EQUIP = ( ( INT16_MAX - ( sizeof( struct packet_itemlist_equip ) - ( sizeof( struct EQUIPITEM_INFO ) * MAX_ITEMLIST ) ) ) / sizeof( struct EQUIPITEM_INFO ) );

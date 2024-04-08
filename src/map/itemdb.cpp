@@ -1169,6 +1169,35 @@ uint64 ItemDatabase::parseBodyNode(const ryml::NodeRef& node) {
 		item->collection_stack = 1;
 	}
 
+	if (this->nodeExists(node, "CharmMaxEffect")) {
+		uint32 max_effect;
+
+		if (!this->asUInt32(node, "CharmMaxEffect", max_effect))
+			return 0;
+
+		item->max_charm_stack = max_effect;
+	} else {
+		if (!exists)
+			item->max_charm_stack = 1;
+	}
+
+	if (this->nodeExists(node, "CharmScript")) {
+		std::string script;
+
+		if (!this->asString(node, "CharmScript", script))
+			return 0;
+
+		if (exists && item->charm_script) {
+			script_free_code(item->charm_script);
+			item->charm_script = nullptr;
+		}
+
+		item->charm_script = parse_script(script.c_str(), this->getCurrentFile().c_str(), this->getLineNumber(node["CharmScript"]), SCRIPT_IGNORE_EXTERNAL_BRACKETS);
+	} else {
+		if (!exists)
+			item->charm_script = nullptr;
+	}
+
 	if (!exists)
 		this->put(nameid, item);
 
@@ -3120,6 +3149,8 @@ const char* itemdb_typename(enum item_types type)
 		case IT_DELAYCONSUME:   return "Delay-Consume Usable";
 		case IT_SHADOWGEAR:     return "Shadow Equipment";
 		case IT_CASH:           return "Cash Usable";
+		case IT_CHARM:			return "Charm";
+		case IT_CHARM_UPGRADE:	return "Charm Upgrade";
 	}
 	return "Unknown Type";
 }
@@ -4946,6 +4977,38 @@ void CollectionComboDatabase::loadingFinished() {
 	TypesafeYamlDatabase::loadingFinished();
 }
 
+bool item_is_charm(t_itemid nameid)
+{
+	std::shared_ptr<item_data> id = item_db.find(nameid);
+
+	if(id == nullptr)
+		return false;
+
+	if(id->type < IT_CHARM || id->type > IT_CHARM_UPGRADE)
+		return false;
+
+	return true;
+}
+
+int item_charm_max_stack(t_itemid nameid, int amount)
+{
+	std::shared_ptr<item_data> id = item_db.find(nameid);
+
+	if(id == nullptr)
+		return 0;
+
+	int ret = amount;
+
+	if(id->type == IT_CHARM){
+		if(ret>id->max_charm_stack)
+			ret = id->max_charm_stack;
+	}else if (id->type == IT_CHARM_UPGRADE){
+		ret = 1;
+	}
+
+	return ret;
+}
+
 /**
 * Read all item-related databases
 */
@@ -5011,6 +5074,7 @@ bool item_data::isStackable()
 		case IT_PETEGG:
 		case IT_PETARMOR:
 		case IT_SHADOWGEAR:
+		case IT_CHARM_UPGRADE:
 			return false;
 	}
 	return true;

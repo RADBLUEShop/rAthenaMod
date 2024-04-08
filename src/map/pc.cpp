@@ -5979,6 +5979,9 @@ enum e_additem_result pc_additem(map_session_data *sd,struct item *item,int amou
 	achievement_update_objective(sd, AG_GET_ITEM, 1, id->value_sell);
 	pc_show_questinfo(sd);
 
+	if(id->type == IT_CHARM || id->type == IT_CHARM_UPGRADE)
+		status_calc_pc(sd, SCO_NONE);
+
 	return ADDITEM_SUCCESS;
 }
 
@@ -6001,6 +6004,8 @@ char pc_delitem(map_session_data *sd,int n,int amount,int type, short reason, e_
 
 	log_pick_pc(sd, log_type, -amount, &sd->inventory.u.items_inventory[n]);
 
+	struct item_data *id = itemdb_search(sd->inventory.u.items_inventory[n].nameid);
+
 	sd->inventory.u.items_inventory[n].amount -= amount;
 	sd->weight -= sd->inventory_data[n]->weight*amount ;
 	if( sd->inventory.u.items_inventory[n].amount <= 0 ){
@@ -6015,6 +6020,9 @@ char pc_delitem(map_session_data *sd,int n,int amount,int type, short reason, e_
 		clif_updatestatus(sd,SP_WEIGHT);
 
 	pc_show_questinfo(sd);
+
+	if(id->type == IT_CHARM || id->type == IT_CHARM_UPGRADE)
+		status_calc_pc(sd, SCO_NONE);
 
 	return 0;
 }
@@ -15924,6 +15932,87 @@ TIMER_FUNC(pc_cal_status_timer){
 		return 1;
 
 	status_calc_pc(sd, SCO_NONE);
+	return 0;
+}
+
+static time_t vip_remain_time(map_session_data *sd)
+{
+	int64 remain_time = 0;
+
+	SqlStmt *check;
+	check = SqlStmt_Malloc(mmysql_handle);
+	int64 result = 0;
+
+	if (SQL_ERROR == SqlStmt_Prepare(check, "SELECT `vip_time` FROM `login` WHERE `account_id`= %d", sd->status.account_id) || SqlStmt_Execute(check)) {
+		SqlStmt_ShowDebug(check);
+		SqlStmt_Free(check);
+		return 0;
+	}
+
+	SqlStmt_BindColumn(check, 0, SQLDT_INT64, &result, 0, NULL, NULL);
+
+	while( SQL_SUCCESS == SqlStmt_NextRow(check) ) {
+		remain_time = result;
+	}
+
+	SqlStmt_Free(check);
+
+	return remain_time;
+}
+
+void vip_bonus(map_session_data *sd)
+{
+	if(sd == nullptr)
+		return;
+
+	time_t remain_time = vip_remain_time(sd);
+	time_t current_time = time(NULL);
+
+	if (pc_isvip(sd)) {
+		if(remain_time > current_time && sd->state.recal_vip_time){
+
+			time_t new_tick = (remain_time - current_time)*1000 + 2000;
+			time_t timer_tick = gettick() + new_tick;
+			status_change_start(NULL, &sd->bl, SC_VIPSTATUS, 10000, 1, 0, 0, 0, new_tick, SCSTART_NOAVOID);
+
+			if(sd->vip_timer_tid != INVALID_TIMER)
+				delete_timer(sd->vip_timer_tid, vip_delete_timer);
+
+			sd->vip_timer_tid = add_timer(timer_tick, vip_delete_timer, sd->bl.id, 0);
+			sd->state.recal_vip_time = false;
+		}
+
+		// clean VIP buff
+		if(remain_time < current_time){
+			status_change_end(&sd->bl, SC_VIPSTATUS);
+			return;
+		}
+
+		std::shared_ptr<s_vip_bonus> vip_bonus = vip_bonus_db.find(1);
+		if (vip_bonus != nullptr && vip_bonus->script != nullptr)
+			run_script(vip_bonus->script, 0, sd->bl.id, 0);
+	}else{
+		status_change_end(&sd->bl, SC_VIPSTATUS);
+		sd->vip_timer_tid = INVALID_TIMER;
+	}
+}
+
+TIMER_FUNC(vip_bonus_timer){
+	map_session_data *sd = map_id2sd(id);
+	if( sd == NULL )
+		return 1;
+
+	status_calc_pc(sd, SCO_NONE);
+	return 0;
+}
+
+TIMER_FUNC(vip_delete_timer){
+	map_session_data *sd = map_id2sd(id);
+	if( sd == NULL )
+		return 1;
+
+	status_calc_pc(sd, SCO_NONE);
+	sd->vip_timer_tid = INVALID_TIMER;
 	return 0;
 }
 

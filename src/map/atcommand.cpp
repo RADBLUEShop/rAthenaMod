@@ -10317,6 +10317,8 @@ ACMD_FUNC(vip) {
 		}
 	}
 	chrif_req_login_operation(pl_sd->status.account_id, pl_sd->status.name, CHRIF_OP_LOGIN_VIP, vipdifftime, 7, 0); 
+	pl_sd->state.recal_vip_time = true;
+	add_timer(gettick() + 300,vip_bonus_timer,pl_sd->bl.id,0);
 	return 0;
 }
 

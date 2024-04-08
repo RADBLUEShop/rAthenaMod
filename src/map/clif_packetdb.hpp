@@ -2461,4 +2461,9 @@
 	parseable_packet( HEADER_CZ_RESET_SKILL, sizeof( struct PACKET_CZ_RESET_SKILL ), clif_parse_reset_skill, 0 );
 #endif
 
+#if PACKETVER_MAIN_NUM >= 20230718
+	parseable_packet(HEADER_CZ_REQ_EMOTION_EXPANSION, sizeof(struct PACKET_CZ_REQ_EMOTION_EXPANSION), clif_parse_req_emotion_expansion, 0);
+	parseable_packet(HEADER_CZ_REQ_BUY_EMOTION_EXPANSION, sizeof(struct PACKET_CZ_REQ_BUY_EMOTION_EXPANSION), clif_parse_req_buy_emotion_expansion, 0);
+#endif
+
 #endif /* CLIF_PACKETDB_HPP */

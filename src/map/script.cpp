@@ -23364,6 +23364,8 @@ BUILDIN_FUNC(vip_time) {
 		return SCRIPT_CMD_FAILURE;
 
 	chrif_req_login_operation(sd->status.account_id, sd->status.name, CHRIF_OP_LOGIN_VIP, viptime, 7, 0); 
+	sd->state.recal_vip_time = true;
+	add_timer(gettick() + 300,vip_bonus_timer,sd->bl.id,0);
 #endif
 	return SCRIPT_CMD_SUCCESS;
 }
@@ -27281,6 +27283,36 @@ BUILDIN_FUNC(getcolenchantgrade)
 	return SCRIPT_CMD_SUCCESS;
 }
 
+BUILDIN_FUNC(getcharmrefine)
+{
+	TBL_PC *sd;
+	if (script_rid2sd(sd)){
+		if( current_charm_index == -1 ){
+			script_pushint(st, 0);
+			return SCRIPT_CMD_FAILURE;
+		}
+
+		script_pushint(st,sd->inventory.u.items_inventory[current_charm_index].refine);
+	}else
+		script_pushint(st,0);
+	return SCRIPT_CMD_SUCCESS;
+}
+
+BUILDIN_FUNC(getcharmgrade)
+{
+	TBL_PC *sd;
+	if (script_rid2sd(sd)){
+		if( current_charm_index == -1 ){
+			script_pushint(st, 0);
+			return SCRIPT_CMD_FAILURE;
+		}
+
+		script_pushint(st,sd->inventory.u.items_inventory[current_charm_index].enchantgrade);
+	}else
+		script_pushint(st,0);
+	return SCRIPT_CMD_SUCCESS;
+}
+
 #include <custom/script.inc>
 
 // declarations that were supposed to be exported from npc_chat.cpp
@@ -28049,6 +28081,9 @@ struct script_function buildin_func[] = {
 	BUILDIN_DEF(opencollection, ""),
 	BUILDIN_DEF(getcolrefine,""),
 	BUILDIN_DEF(getcolenchantgrade,""),	
+
+	BUILDIN_DEF(getcharmrefine, ""),
+	BUILDIN_DEF(getcharmgrade, ""),	
 
 #include <custom/script_def.inc>
 

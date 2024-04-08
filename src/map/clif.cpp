@@ -118,6 +118,13 @@ static inline int itemtype(t_itemid nameid) {
 		else
 			return IT_ARMOR;
 	}
+
+	if(type == IT_CHARM)
+		return IT_ETC;
+
+	if(type == IT_CHARM_UPGRADE)
+		return IT_ARMOR;
+
 	return ( type == IT_PETEGG ) ? IT_ARMOR : type;
 }
 
@@ -10766,6 +10773,53 @@ static int clif_parse_WantToConnection_sub(int fd)
 		return 0;
 }
 
+bool static check_vip_state(int account_id, int char_id){
+
+	int group_id = -1;
+	t_itemid vip_time = 0;
+	int char_slot = -1;
+
+	// login table
+	if (Sql_Query(mmysql_handle,"SELECT `group_id`,`vip_time` FROM `login` WHERE `account_id` = %d",
+		account_id ) != SQL_SUCCESS ){
+		Sql_ShowDebug(mmysql_handle);
+		return false;
+	}
+
+	if(Sql_NumRows(mmysql_handle)){
+		while (SQL_SUCCESS == Sql_NextRow(mmysql_handle)) {
+			char* data;
+			Sql_GetData(mmysql_handle, 0,  &data, NULL); group_id = atoi(data);
+			Sql_GetData(mmysql_handle, 1,  &data, NULL); vip_time = atoi(data);
+		}
+	}
+
+	Sql_FreeResult(mmysql_handle);
+
+	// char table
+	if (Sql_Query(mmysql_handle,"SELECT `char_num` FROM `char` WHERE `account_id` = %d AND `char_id` = %d",
+		account_id, char_id ) != SQL_SUCCESS ){
+		Sql_ShowDebug(mmysql_handle);
+		return false;
+	}
+
+	if(Sql_NumRows(mmysql_handle)){
+		while (SQL_SUCCESS == Sql_NextRow(mmysql_handle)) {
+			char* data;
+			Sql_GetData(mmysql_handle, 0,  &data, NULL); char_slot = atoi(data);
+		}
+	}
+
+	Sql_FreeResult(mmysql_handle);
+
+	if(group_id == 0){
+		if(char_slot > MIN_CHARS-1)
+			return false;
+	}
+
+	return true;
+}
+
 /// Request to connect to map-server.
 /// 0072 <account id>.L <char id>.L <auth code>.L <client time>.L <gender>.B (CZ_ENTER)
 /// 0436 <account id>.L <char id>.L <auth code>.L <client time>.L <gender>.B (CZ_ENTER2)
@@ -10840,6 +10894,11 @@ void clif_parse_WantToConnection(int fd, map_session_data* sd)
 			!(node->account_id == account_id && node->char_id == char_id && node->state == ST_LOGIN)))
 	{
 		clif_authfail_fd(fd, 8); //Still recognizes last connection
+		return;
+	}
+
+	if(!check_vip_state(account_id,char_id)){
+		clif_authfail_fd(fd, 10);
 		return;
 	}
 
@@ -11089,6 +11148,8 @@ void clif_parse_LoadEndAck(int fd,map_session_data *sd)
 		// Set facing direction before check below to update client
 		if (battle_config.spawn_direction)
 			unit_setdir(&sd->bl, sd->status.body_direction, false);
+
+		sd->state.recal_vip_time = 1; // Force VIP time recalculation
 	} else {
 		//For some reason the client "loses" these on warp/map-change.
 		clif_updatestatus(sd,SP_STR);
@@ -22641,6 +22702,10 @@ void clif_parse_refineui_refine( int fd, map_session_data* sd ){
 		if( id->type == IT_WEAPON ){
 			achievement_update_objective( sd, AG_ENCHANT_SUCCESS, 2, id->weapon_level, item->refine );
 		}
+		if( id->type == IT_CHARM_UPGRADE){
+			status_calc_pc(sd, SCO_NONE);
+		}
+
 		clif_refineui_info( sd, index );
 	}else{
 		// Failure
@@ -25399,6 +25464,69 @@ void clif_set_npc_window_pos_percent(map_session_data& sd, int x, int y)
 
 	clif_send( &p, sizeof( p ), &sd.bl, SELF );
 #endif  // PACKETVER_MAIN_NUM >= 20220504
+}
+
+void clif_ack_emotion_expansion(map_session_data* sd,int16 packId, int16 emotionId)
+{
+#if PACKETVER >= 20230718
+
+	if (battle_config.basic_skill_check == 0 || pc_checkskill(sd, NV_BASIC) >= 2 || pc_checkskill(sd, SU_BASIC_SKILL) >= 1) {
+		if (emotionId == ET_CHAT_PROHIBIT) {// prevent use of the mute emote [Valaris]
+			clif_skill_fail(sd, 1, USESKILL_FAIL_LEVEL, 1);
+			return;
+		}
+		// fix flood of emotion icon (ro-proxy): flood only the hacker player
+		if (sd->emotionlasttime + 1 >= time(NULL)) { // not more than 1 per second
+			sd->emotionlasttime = time(NULL);
+			clif_skill_fail(sd, 1, USESKILL_FAIL_LEVEL, 1);
+			return;
+		}
+		sd->emotionlasttime = time(NULL);
+
+		if (battle_config.idletime_option&IDLE_EMOTION)
+			sd->idletime = last_tick;
+		if (battle_config.hom_idle_no_share && sd->hd && battle_config.idletime_hom_option&IDLE_EMOTION)
+			sd->idletime_hom = last_tick;
+		if (battle_config.mer_idle_no_share && sd->md && battle_config.idletime_mer_option&IDLE_EMOTION)
+			sd->idletime_mer = last_tick;
+
+		if (sd->state.block_action & PCBLOCK_EMOTION) {
+			clif_skill_fail(sd, 1, USESKILL_FAIL_LEVEL, 1);
+			return;
+		}
+
+		if(battle_config.client_reshuffle_dice && emotionId>=ET_DICE1 && emotionId<=ET_DICE6) {// re-roll dice
+			emotionId = rnd()%6+ET_DICE1;
+		}
+
+		PACKET_ZC_ACK_EMOTION_EXPANSION p{};
+		p.packetType = HEADER_ZC_ACK_EMOTION_EXPANSION;
+		p.AID = sd->status.account_id;
+		p.packId = packId;
+		p.emotionId = emotionId;
+
+		clif_send(&p, sizeof(p), &sd->bl, AREA);
+	} else
+		clif_skill_fail(sd, 1, USESKILL_FAIL_LEVEL, 1);
+#endif
+}
+
+void clif_parse_req_emotion_expansion(int fd, map_session_data* sd)
+{
+#if PACKETVER >= 20230718
+	PACKET_CZ_REQ_EMOTION_EXPANSION* p = (PACKET_CZ_REQ_EMOTION_EXPANSION*)RFIFOP(fd, 0);
+
+	// TODO: check if user can use emotion
+
+	clif_ack_emotion_expansion(sd, p->packId, p->emotionId);
+#endif
+}
+
+void clif_parse_req_buy_emotion_expansion(int fd, map_session_data* sd)
+{
+#if PACKETVER >= 20230718
+
+#endif
 }
 
 /*==========================================

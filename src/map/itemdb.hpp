@@ -3092,6 +3092,7 @@ struct item_data
 	struct script_code *equip_script;	//Script executed once when equipping.
 	struct script_code *unequip_script;//Script executed once when unequipping.
 	struct script_code *collection_script;
+	struct script_code *charm_script;
 	struct {
 		unsigned available : 1;
 		uint32 no_equip;
@@ -3149,6 +3150,11 @@ struct item_data
 			this->collection_script = nullptr;
 		}
 
+		if (this->charm_script){
+			script_free_code(this->charm_script);
+			this->charm_script = nullptr;
+		}
+
 		this->combos.clear();
 		this->collection_combos.clear();
 	}
@@ -3156,6 +3162,7 @@ struct item_data
 	bool isStackable();
 	int inventorySlotNeeded(int quantity);
 	int collection_stack;
+	int max_charm_stack;
 };
 
 class ItemDatabase : public TypesafeCachedYamlDatabase<t_itemid, item_data> {
@@ -3473,6 +3480,9 @@ extern std::vector<extended_vending> extended_vending_lists;
 
 bool item_is_collection(t_itemid nameid);
 bool item_is_collection_stack(t_itemid nameid);
+
+bool item_is_charm(t_itemid nameid);
+int item_charm_max_stack(t_itemid name, int amount);
 
 void itemdb_reload(void);
 

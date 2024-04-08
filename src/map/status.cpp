@@ -56,6 +56,7 @@ int current_equip_card_id; /// To prevent card-stacking (from jA) [Skotlex]
 // We need it for new cards 15 Feb 2005, to check if the combo cards are insrerted into the CURRENT weapon only to avoid cards exploits
 short current_equip_opt_index; /// Contains random option index of an equipped item. [Secret]
 short current_collection_index;
+short current_charm_index;
 
 uint16 SCDisabled[SC_MAX]; ///< List of disabled SC on map zones. [Cydh]
 
@@ -459,6 +460,11 @@ bool RefineDatabase::calculate_refine_info( const struct item_data& data, e_refi
 	}else if( data.type == IT_ARMOR ){
 		refine_type = REFINE_TYPE_ARMOR;
 		level = data.armor_level;
+
+		return true;
+	}else if( data.type == IT_CHARM_UPGRADE){
+		refine_type = REFINE_TYPE_CHARM_UPGRADE;
+		level = 0;
 
 		return true;
 	}else if( data.type == IT_SHADOWGEAR ){
@@ -3804,6 +3810,27 @@ int status_calc_pc_sub(map_session_data* sd, uint8 opt)
 		}
 	}
 
+	// --------- Charm ---------
+	current_charm_index = -1;
+	for (i = 0; i < MAX_INVENTORY; i++){
+
+		current_charm_index = i;
+
+		if (sd->inventory.u.items_inventory[i].nameid == 0 || !item_is_charm(sd->inventory.u.items_inventory[i].nameid))
+			continue;
+
+		struct item_data *charm_info = itemdb_search(sd->inventory.u.items_inventory[i].nameid);
+
+		int max_effect = item_charm_max_stack(sd->inventory.u.items_inventory[i].nameid,sd->inventory.u.items_inventory[i].amount);
+
+		if (charm_info && charm_info->charm_script){
+			for (int j = 0; j < max_effect; j++)
+				run_script(charm_info->charm_script, 0, sd->bl.id, 0);
+			}
+	}
+
+	vip_bonus(sd);
+
 	// Parse equipment
 	for (i = 0; i < EQI_MAX; i++) {
 		current_equip_item_index = index = sd->equip_index[i]; // We pass INDEX to current_equip_item_index - for EQUIP_SCRIPT (new cards solution) [Lupus]
@@ -4936,6 +4963,8 @@ int status_calc_pc_sub(map_session_data* sd, uint8 opt)
 		sc_start(&sd->bl, &sd->bl, SC_SPRITEMABLE, 100, 1, INFINITE_TICK);
 	if (pc_checkskill(sd, SU_SOULATTACK) > 0 && !sd->sc.getSCE(SC_SOULATTACK))
 		sc_start(&sd->bl, &sd->bl, SC_SOULATTACK, 100, 1, INFINITE_TICK);
+
+	pc_check_equip_allow(sd);
 
 	calculating = 0;
 
@@ -6084,6 +6113,7 @@ void status_calc_bl_main(struct block_list *bl, std::bitset<SCB_MAX> flag)
 #ifndef RENEWAL_ASPD
 			status->aspd_rate = status_calc_aspd_rate(bl, sc, b_status->aspd_rate);
 #endif
+			amotion = cap_value(amotion,pc_maxaspd(sd),2000);
 			// Absolute ASPD % modifiers
 			amotion = amotion * status->aspd_rate / 1000;
 			if (sd->ud.skilltimer != INVALID_TIMER && (skill_lv = pc_checkskill(sd, SA_FREECAST)) > 0)
@@ -16077,6 +16107,207 @@ void StatusDatabase::loadingFinished(){
 
 StatusDatabase status_db;
 
+const std::string NoEquipDatabase::getDefaultLocation(){
+	return std::string(db_path) + "/custom/no_equip.yml";
+}
+
+uint64 NoEquipDatabase::parseBodyNode( const ryml::NodeRef& node ){
+	uint16 group_id;
+
+	if (!this->asUInt16(node, "GroupId",group_id))
+		return 0;
+
+	std::shared_ptr<s_no_equip> noequip = this->find(group_id);
+	bool exists = noequip != nullptr;
+
+	if (!exists) {
+		if (!this->nodesExist(node,{ "GroupId","Type","MapLists","ItemLists"}))
+			return 0;
+
+		noequip = std::make_shared<s_no_equip>();
+		noequip->group_id = group_id;
+	}
+
+	if (this->nodeExists(node, "Type")) {
+		std::string type;
+
+		if (!this->asString(node, "Type", type))
+			return 0;
+
+		util::tolower(type);
+
+		if(type.compare("equip") == 0){
+			noequip->is_allow = true;
+		} else {
+			noequip->is_allow = false;
+		}
+	}
+
+
+	if(this->nodeExists(node, "MapLists" )){
+		for(const ryml::NodeRef& MapNode : node["MapLists"]){
+
+			std::string map_name;
+
+			if(!this->asString( MapNode, "Map", map_name)){
+				return 0;
+			}
+
+			// lower case map name
+			util::tolower(map_name);
+
+			// check if map exists
+			if(mapindex_name2id(map_name.c_str()) == 0){
+				this->invalidWarning( MapNode["Map"], "Unknown map \"%s\".\n", map_name.c_str() );
+				continue;
+			}
+
+			uint16 map_index = map_mapname2mapid(map_name.c_str());
+
+			if(util::vector_exists(noequip->maps, map_index))
+				continue;
+
+			noequip->maps.push_back(map_index);
+		}
+	}
+
+	if (this->nodeExists(node, "ItemLists")) {
+		for(const ryml::NodeRef& itemNode : node["ItemLists"]){
+
+			std::string item_name;
+
+			if (!this->asString(itemNode, "Item", item_name))
+				return 0;
+
+			std::shared_ptr<item_data> item = item_db.search_aegisname( item_name.c_str() );
+
+			if (item == nullptr) {
+				this->invalidWarning(itemNode["Item"], "item %s does not exist, skipping.\n", item_name.c_str());
+				continue;
+			}
+
+			if(util::vector_exists(noequip->items,item->nameid))
+				continue;
+
+			noequip->items.push_back(item->nameid);
+		}
+	}
+
+	if (!exists)
+		this->put(noequip->group_id, noequip);
+
+	return 1;
+}
+
+NoEquipDatabase no_equip_db;
+
+void pc_check_equip_allow(map_session_data *sd)
+{
+	nullpo_retv(sd);
+
+	if(map_getmapflag(sd->bl.m, MF_NOEQUIP)){
+
+		bool is_allow = false;
+		std::vector<t_itemid> items = {};
+
+		for(auto &entry : no_equip_db){
+			if(util::vector_exists(entry.second->maps,sd->bl.m)){
+				is_allow = entry.second->is_allow;
+				items = entry.second->items;
+				break;
+			}
+		}
+
+		for (int i = 0; i < EQI_MAX; i++) {
+			int index = sd->equip_index[i];
+
+			// no equip
+			if(is_allow == false){
+				if(index >= 0 && sd->inventory_data[index]->equip && util::vector_exists(items, sd->inventory_data[index]->nameid)){
+					pc_unequipitem(sd, index, 3);
+				}
+
+			// allow equip
+			}else if(is_allow == true){
+				if(index >= 0 && sd->inventory_data[index]->equip && !util::vector_exists(items, sd->inventory_data[index]->nameid)){
+					pc_unequipitem(sd, index, 3);
+				}
+
+			}
+		}
+
+		status_calc_pc(sd,SCO_NONE);
+	}
+}
+
+const std::string VipBonusDatabase::getDefaultLocation() {
+	return std::string(db_path) + "/custom/vip_bonus.yml";
+}
+
+/**
+ * Reads and parses an entry from the rank_title
+ * @param node: YAML node containing the entry.
+ * @return count of successfully parsed rows
+ */
+uint64 VipBonusDatabase::parseBodyNode(const ryml::NodeRef& node) {
+
+	if (!this->nodesExist(node, { "Id" }))
+		return 0;
+
+		uint16 Id;
+
+	if (!this->asUInt16(node, "Id", Id))
+		return 0;
+
+	std::shared_ptr<s_vip_bonus> VipBonus = this->find(Id);
+	bool exists = VipBonus != nullptr;
+
+	if (!exists) {
+		if (!this->nodesExist(node, { "Id" }))
+			return 0;
+
+		VipBonus = std::make_shared<s_vip_bonus>();
+		VipBonus->id = Id;
+	}
+
+    if (this->nodeExists(node, "Script")) {
+		std::string script;
+
+		if (!this->asString(node, "Script", script))
+			return 0;
+
+		if (exists && VipBonus->script) {
+			script_free_code(VipBonus->script);
+			VipBonus->script = nullptr;
+		}
+
+		VipBonus->script = parse_script(script.c_str(), this->getCurrentFile().c_str(), this->getLineNumber(node["Script"]), SCRIPT_IGNORE_EXTERNAL_BRACKETS);
+	} else {
+		if (!exists)
+			VipBonus->script = nullptr;
+	}
+
+	if( !exists ){
+		this->put( VipBonus->id , VipBonus );
+	}
+	return 1;
+}
+
+VipBonusDatabase vip_bonus_db;
+
+static void apply_vip_bouns()
+{
+	struct s_mapiterator* iter;
+	map_session_data* sd;
+
+	iter = mapit_geteachpc();
+	for (sd = (map_session_data*)mapit_first(iter); mapit_exists(iter); sd = (map_session_data*)mapit_next(iter)) {
+		status_calc_pc(sd, SCO_NONE);
+	}
+
+	mapit_free(iter);
+}
+
 /**
  * Sets defaults in tables and starts read db functions
  * sv_readdb reads the file, outputting the information line-by-line to
@@ -16123,13 +16354,18 @@ void status_readdb( bool reload ){
 		refine_db.reload();
 		status_db.reload();
 		enchantgrade_db.reload();
+		no_equip_db.reload();
+		vip_bonus_db.reload();
 	}else{
 		size_fix_db.load();
 		refine_db.load();
 		status_db.load();
 		enchantgrade_db.load();
+		no_equip_db.load();
+		vip_bonus_db.load();
 	}
 	elemental_attribute_db.load();
+	apply_vip_bouns();
 }
 
 /**
@@ -16156,4 +16392,6 @@ void do_final_status(void) {
 	refine_db.clear();
 	status_db.clear();
 	elemental_attribute_db.clear();
+	no_equip_db.clear();
+	vip_bonus_db.clear();
 }
