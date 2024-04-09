@@ -5075,6 +5075,166 @@ static bool itemdb_read_ai_item_buff(char* fields[], size_t columns, size_t curr
 	return true;
 }
 
+const std::string GlobalDropDatabase::getDefaultLocation() {
+	return std::string(db_path) + "/custom/global_drops.yml";
+}
+
+/**
+ * Reads and parses an entry from the global drop.
+ * @param node: YAML node containing the entry.
+ * @return count of successfully parsed rows
+ */
+uint64 GlobalDropDatabase::parseBodyNode(const ryml::NodeRef &node){
+
+	if (!this->nodesExist(node, {"Name"}))
+		return 0;
+
+	std::string name;
+
+	if(!this->asString(node, "Name", name))
+		return 0;
+
+	std::shared_ptr<s_global_drops> GlobalDrops = std::make_shared<s_global_drops>();
+	// auto id
+	GlobalDrops->id = (int16)global_drop_db.size()+1;
+
+	if (name.length() > 50)
+		this->invalidWarning(node["Name"], "Event name \"%s\" is exceeds maximum of %d characters, capping...\n", name.c_str(), 50 - 1);
+
+	GlobalDrops->name = name;
+
+
+	if(this->nodeExists(node, "ReduceMap" )){
+		for(const ryml::NodeRef& MapNode : node["ReduceMap"]){
+
+			std::string map_name;
+
+			if(!this->asString( MapNode, "Map", map_name)){
+				return 0;
+			}
+
+			// check if map exists
+			if(mapindex_name2id(map_name.c_str()) == 0){
+				this->invalidWarning( MapNode["Map"], "Unknown map \"%s\".\n", map_name.c_str() );
+				continue;
+			}
+
+			uint16 map_index = map_mapname2mapid(map_name.c_str());
+
+			std::shared_ptr<s_global_drop_map> DropMaps = util::map_find(GlobalDrops->ReduceRateMap , map_index);
+
+			if(DropMaps != nullptr)
+				continue;
+
+			if (this->nodeExists(MapNode, "Rate")) {
+				int16 drop_rate;
+
+				if (!this->asInt16(MapNode, "Rate", drop_rate))
+					return 0;
+
+				if(drop_rate < 0 || drop_rate > 100){
+					this->invalidWarning(MapNode["Rate"], "Rate must be between 0 and 100.\n");
+					continue;
+				}
+
+				DropMaps = std::make_shared<s_global_drop_map>();
+				DropMaps->mapindex = map_index;
+				DropMaps->rate = drop_rate;
+				GlobalDrops->ReduceRateMap[map_index] = DropMaps;
+			}
+		}
+	}
+
+	if(this->nodeExists(node, "NoDropMap" )){
+		for(const ryml::NodeRef& NoDropMapNode : node["NoDropMap"]){
+
+			std::string map_name;
+
+			if(!this->asString( NoDropMapNode, "Map", map_name)){
+				return 0;
+			}
+
+			// check if map exists
+			if(mapindex_name2id(map_name.c_str()) == 0){
+				this->invalidWarning( NoDropMapNode["Map"], "Unknown map \"%s\".\n", map_name.c_str() );
+				continue;
+			}
+
+			int map_index = map_mapname2mapid(map_name.c_str());
+
+			if(util::vector_exists(GlobalDrops->NoDropMap,map_index))
+				continue;
+
+			GlobalDrops->NoDropMap.push_back(map_index);
+		}
+	}else{
+		GlobalDrops->NoDropMap = {};
+	}
+
+	if (this->nodeExists(node, "TargetItems")) {
+		for(const ryml::NodeRef& itemrate : node["TargetItems"]){
+
+			std::string item_name;
+
+			if (!this->asString(itemrate, "Item", item_name))
+				return 0;
+
+			std::shared_ptr<item_data> item = item_db.search_aegisname( item_name.c_str() );
+
+			if (item == nullptr) {
+				this->invalidWarning(itemrate["Item"], "item %s does not exist, skipping.\n", item_name.c_str());
+				continue;
+			}
+
+			std::shared_ptr<s_global_drop_item> ItemDrop = util::umap_find(GlobalDrops->items, item->nameid);
+			bool target_exists = ItemDrop != nullptr;
+
+			if (target_exists)
+				continue;
+
+			int rate;
+
+			if (!this->asInt32(itemrate, "Rate", rate))
+				return 0;
+
+			if(rate < 0){
+				this->invalidWarning(itemrate["Rate"], "Invalid rate %d, defaulting to 0.\n", rate);
+				rate = 0;
+			}
+
+			ItemDrop = std::make_shared<s_global_drop_item>();
+			ItemDrop->itemid = item->nameid;
+			ItemDrop->rate = rate;
+
+			if (this->nodeExists(itemrate, "DropEffect")) {
+				std::string effect;
+
+				if (!this->asString(itemrate, "DropEffect", effect))
+					return 0;
+
+				int64 constant;
+
+				if (!script_get_constant(effect.c_str(), &constant) || constant < DROPEFFECT_NONE || constant > DROPEFFECT_MAX) {
+					this->invalidWarning(itemrate["DropEffect"], "Invalid item drop effect %s, defaulting to DROPEFFECT_NONE.\n", effect.c_str());
+					constant = DROPEFFECT_NONE;
+				}
+
+				ItemDrop->dropeffect = static_cast<e_item_drop_effect>(constant);
+			} else {
+				ItemDrop->dropeffect = DROPEFFECT_NONE;
+			}
+
+			GlobalDrops->items.insert({ItemDrop->itemid, ItemDrop});
+		}
+	}
+
+	this->put(GlobalDrops->id, GlobalDrops);
+	
+	return 1;
+}
+
+GlobalDropDatabase global_drop_db;
+
 /**
 * Read all item-related databases
 */
@@ -5124,6 +5284,7 @@ static void itemdb_read(void) {
 	item_enchant_db.load();
 	item_package_db.load();
 	collection_combo_db.load();
+	global_drop_db.load();
 
 	if (battle_config.feature_roulette)
 		itemdb_parse_roulette_db();	
@@ -5222,6 +5383,8 @@ void do_final_itemdb(void) {
 	item_enchant_db.clear();
 	item_package_db.clear();
 	collection_combo_db.clear();
+	global_drop_db.clear();
+	
 	if (battle_config.feature_roulette)
 		itemdb_roulette_free();
 

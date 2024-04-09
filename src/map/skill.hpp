@@ -309,6 +309,8 @@ struct s_skill_db {
 	uint16 improvisedsong_rate;
 	sc_type sc;									///< Default SC for skill
 	int ai_skill_type;
+
+	int32 hard_delay;
 };
 
 class SkillDatabase : public TypesafeCachedYamlDatabase <uint16, s_skill_db> {
@@ -551,6 +553,7 @@ int skill_get_state(uint16 skill_id);
 int skill_get_status_count( uint16 skill_id );
 int skill_get_spiritball( uint16 skill_id, uint16 skill_lv );
 unsigned short skill_dummy2skill_id(unsigned short skill_id);
+int skill_get_hard_delay( uint16 skill_id);
 
 uint16 skill_name2id(const char* name);
 
@@ -2850,5 +2853,10 @@ enum e_skill_info_type : uint8 {
 	SKILL_INFO_SUPPORT		= 2,
 	SKILL_INFO_HEAL			= 3,
 };
+
+TIMER_FUNC(skill_harddelay_end);
+int skill_harddelay_start(map_session_data *sd, int, t_tick);
+int skill_harddelay_get(map_session_data *sd, int skillid);
+int skill_harddelay_clear(map_session_data *sd);
 
 #endif /* SKILL_HPP */

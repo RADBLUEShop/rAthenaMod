@@ -223,6 +223,7 @@ int skill_get_state( uint16 skill_id )                             { skill_get(s
 int skill_get_status_count( uint16 skill_id )                      { skill_get(skill_id, skill_db.find(skill_id)->require.status.size()); }
 int skill_get_spiritball( uint16 skill_id, uint16 skill_lv )       { skill_get_lv(skill_id, skill_lv, skill_db.find(skill_id)->require.spiritball); }
 sc_type skill_get_sc(int16 skill_id)                               { if (!skill_check(skill_id)) return SC_NONE; return skill_db.find(skill_id)->sc; }
+int skill_get_hard_delay( uint16 skill_id)	   					   { skill_get(skill_id, skill_db.find(skill_id)->hard_delay); }
 
 int skill_get_splash( uint16 skill_id , uint16 skill_lv ) {
 	int splash = skill_get_splash_(skill_id, skill_lv);
@@ -826,6 +827,59 @@ int8 skill_isCopyable(map_session_data *sd, uint16 skill_id) {
 	return 0;
 }
 
+/*==========================================
+ *
+ *------------------------------------------*/
+int skill_harddelay_get(map_session_data *sd, int skillid) {
+	nullpo_retr(-1, sd);
+
+	for(const auto& shd : sd->shd) {
+		if (shd.skill_id == skillid)
+			return 0;
+	}
+
+	return -1;
+}
+
+TIMER_FUNC(skill_harddelay_end){
+	map_session_data *sd = map_id2sd(id);
+	int skill_id = (int)data;
+
+	if (!sd)
+		return 0;
+
+	bool found = false;
+
+    for(int i = 0; i < sd->shd.size(); i++) {
+        if(sd->shd[i].skill_id == skill_id) {
+            found = true;
+            delete_timer(sd->shd[i].timer, skill_harddelay_end);
+            sd->shd.erase(sd->shd.begin() + i);
+			break;
+        }
+    }
+
+    if (!found)
+        ShowWarning("skill_harddelay_end: Invalid Timer or not Skill Cooldown.\n");
+
+    return 0;
+}
+
+int skill_harddelay_start(map_session_data *sd, int skill_id, t_tick tick) {
+
+	nullpo_retr(-1, sd);
+
+	if(!skill_id || tick < 1)
+		return -1;
+
+	struct skill_cooldown_entry shd = {};
+	shd.skill_id = skill_id;
+	shd.timer = add_timer(gettick() + tick, skill_harddelay_end, sd->bl.id, skill_id);
+	sd->shd.push_back(shd);
+	return 0;
+}
+
+
 /**
  * Check if the skill is ok to cast and when.
  * Done before skill_check_condition_castbegin, requirement
@@ -848,6 +902,11 @@ bool skill_isNotOk(uint16 skill_id, map_session_data *sd)
 
 	if (mapdata->getMapFlag(MF_NOSKILL) && skill_id != ALL_EQSWITCH && !sd->skillitem) //Item skills bypass noskill
 		return true;
+
+	if (skill_harddelay_get(sd, skill_id) != -1){
+		clif_skill_fail(sd,skill_id,USESKILL_FAIL,0);
+		return true;
+	}
 
 	// Epoque:
 	// This code will compare the player's attack motion value which is influenced by ASPD before
@@ -6615,6 +6674,10 @@ int skill_castend_damage_id (struct block_list* src, struct block_list *bl, uint
 
 				if( cooldown > 0 )
 					skill_blockpc_start(sd, pres_skill_id, cooldown);
+
+				int hard_delay = skill_get_hard_delay(pres_skill_id);
+				if(hard_delay)
+					skill_harddelay_start(sd, pres_skill_id, hard_delay);					
 			} else { // Summoned Balls
 				for (i = SC_SPHERE_5; i >= SC_SPHERE_1; i--) {
 					if (sc->getSCE(static_cast<sc_type>(i)) == nullptr)
@@ -9856,9 +9919,11 @@ int skill_castend_nodamage_id (struct block_list *src, struct block_list *bl, ui
 
 	case BS_GREED:
 		if(sd){
+			sd->special_state.greed_pickup = 1;
 			clif_skill_nodamage(src,bl,skill_id,skill_lv,1);
 			map_foreachinallrange(skill_greed,bl,
 				skill_get_splash(skill_id, skill_lv),BL_ITEM,bl);
+			sd->special_state.greed_pickup = 0;
 		}
 		break;
 
@@ -13409,6 +13474,8 @@ TIMER_FUNC(skill_castend_id){
 		if (sd) { //Cooldown application
 			int cooldown = pc_get_skillcooldown(sd,ud->skill_id, ud->skill_lv); // Increases/Decreases cooldown of a skill by item/card bonuses.
 			if(cooldown) skill_blockpc_start(sd, ud->skill_id, cooldown);
+			int hard_delay = skill_get_hard_delay(ud->skill_id);
+			if(hard_delay) skill_harddelay_start(sd, ud->skill_id, hard_delay);			
 		}
 		if( battle_config.display_status_timers && sd )
 			clif_status_change(src, EFST_POSTDELAY, 1, skill_delayfix(src, ud->skill_id, ud->skill_lv), 0, 0, 0);
@@ -13643,6 +13710,8 @@ TIMER_FUNC(skill_castend_pos){
 		if (sd) { //Cooldown application
 			int cooldown = pc_get_skillcooldown(sd,ud->skill_id, ud->skill_lv);
 			if(cooldown) skill_blockpc_start(sd, ud->skill_id, cooldown);
+			int hard_delay = skill_get_hard_delay(ud->skill_id);
+			if(hard_delay) skill_harddelay_start(sd, ud->skill_id, hard_delay);			
 		}
 		if( battle_config.display_status_timers && sd )
 			clif_status_change(src, EFST_POSTDELAY, 1, skill_delayfix(src, ud->skill_id, ud->skill_lv), 0, 0, 0);
@@ -24221,6 +24290,18 @@ uint64 SkillDatabase::parseBodyNode(const ryml::NodeRef& node) {
 			memset(skill->cast, 0, sizeof(skill->cast));
 	}
 
+	if (this->nodeExists(node, "HardDelay")) {
+		uint16 delay;
+
+		if (!this->asUInt16(node, "HardDelay", delay))
+			return 0;
+
+		skill->hard_delay = delay;
+	} else {
+		if (!exists)
+			skill->hard_delay = 0;
+	}	
+
 	if (this->nodeExists(node, "AfterCastActDelay")) {
 		if (!this->parseNode("AfterCastActDelay", "Time", node, skill->delay))
 			return 0;
@@ -25482,6 +25563,7 @@ void do_init_skill(void)
 	add_timer_func_list(skill_timerskill,"skill_timerskill");
 	add_timer_func_list(skill_blockpc_end, "skill_blockpc_end");
 	add_timer_func_list(skill_keep_using, "skill_keep_using");
+	add_timer_func_list(skill_harddelay_end, "skill_harddelay_end");
 
 	add_timer_interval(gettick()+SKILLUNITTIMER_INTERVAL,skill_unit_timer,0,0,SKILLUNITTIMER_INTERVAL);
 }

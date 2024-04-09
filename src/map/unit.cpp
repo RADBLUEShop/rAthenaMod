@@ -2774,6 +2774,9 @@ static int unit_attack_timer_sub(struct block_list* src, int tid, t_tick tick)
 	if (tid == INVALID_TIMER && sd)
 		clif_fixpos(src);
 
+	if (sd && battle_config.attack_motion_time && DIFF_TICK(sd->attack_motion, tick) > 0)
+		return 0;
+
 	if( DIFF_TICK(ud->attackabletime,tick) <= 0 ) {
 		if (battle_config.attack_direction_change && (src->type&battle_config.attack_direction_change))
 			unit_setdir(src, map_calc_dir(src, target->x, target->y), false);
@@ -2831,6 +2834,9 @@ static int unit_attack_timer_sub(struct block_list* src, int tid, t_tick tick)
 
 	if( sd && battle_config.prevent_logout_trigger&PLT_ATTACK )
 		sd->canlog_tick = gettick();
+
+	if(sd && battle_config.attack_motion_time)
+		sd->attack_motion = tick+(status_get_amotion(src)*2) - battle_config.attack_motion_time;
 
 	return 1;
 }

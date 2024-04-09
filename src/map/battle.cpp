@@ -11456,6 +11456,9 @@ static const struct _battle_data {
 	{ "max_magic_def_rate",					&battle_config.max_magic_def_rate,				0,      0,      100,			},
 	{ "max_misc_def_rate",					&battle_config.max_misc_def_rate,				0,      0,      100,			},
 
+	{ "pickup_item_motion_time",      		&battle_config.pickup_item_motion_time,   		200,	0,      INT_MAX,		},
+	{ "attack_motion_time",      			&battle_config.attack_motion_time,   			0,		0,      INT_MAX,		},
+
 #include <custom/battle_config_init.inc>
 };
 

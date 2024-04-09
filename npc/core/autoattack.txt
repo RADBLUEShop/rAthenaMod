@@ -322,7 +322,7 @@ heal_menu:
 		mes autoattackstrinfo(GET_INFO_HEAL,-1);
 
 		input .@heal_skillid;
-		if(.@heal_skillid < 1 !skillinfocheck(SKILL_INFO_HEAL,.@heal_skillid))
+		if(.@heal_skillid < 1 || !skillinfocheck(SKILL_INFO_HEAL,.@heal_skillid))
 			goto(heal_menu);
 
 		do{

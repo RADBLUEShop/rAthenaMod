@@ -15,6 +15,7 @@
 
 #include "script.hpp"
 #include "status.hpp"
+#include "mob.hpp"
 
 enum e_ammo_type : uint8;
 
@@ -3493,6 +3494,39 @@ struct s_ai_item_buff {
 
 extern std::vector<s_ai_item_buff> ai_item_buff;
 extern std::vector<t_itemid> ai_item_buff_reset;
+
+struct s_global_drop_item {
+	t_itemid itemid;
+	int rate;
+	e_item_drop_effect dropeffect;
+};
+
+struct s_global_drop_map {
+	int16 mapindex;
+	int16 rate;
+};
+
+struct s_global_drops {
+	int16 id;
+	std::string name;
+	std::vector<int16> NoDropMap;	
+	std::map<uint16,std::shared_ptr<s_global_drop_map>> ReduceRateMap;
+	std::unordered_map<t_itemid, std::shared_ptr<s_global_drop_item>> items;
+};
+
+class GlobalDropDatabase : public TypesafeYamlDatabase<int16, s_global_drops> {
+
+public:
+	GlobalDropDatabase() : TypesafeYamlDatabase("GLOBAL_DROP_DB",1){
+
+	}
+
+	const std::string getDefaultLocation();
+	uint64 parseBodyNode(const ryml::NodeRef& node);
+	int get_random_option_id(std::string name);
+};
+
+extern GlobalDropDatabase global_drop_db;
 
 void itemdb_reload(void);
 

@@ -811,6 +811,9 @@ struct Battle_Config
 	int max_magic_def_rate;
 	int max_misc_def_rate;	
 
+	int pickup_item_motion_time;
+	int attack_motion_time;
+
 #include <custom/battle_config_struct.inc>
 };
 

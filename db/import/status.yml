@@ -46,7 +46,7 @@ Header:
 
 Body:
   - Status: VIPSTATUS
-    Icon: EFST_VIPSTATUS
+    Icon: EFST_VIP_STATUS
     Flags:
       NoRemoveOnDead: true
       NoClearbuff: true

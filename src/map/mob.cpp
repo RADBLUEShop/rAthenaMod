@@ -2939,6 +2939,34 @@ int mob_dead(struct mob_data *md, struct block_list *src, int type)
 			mob_item_drop(md, dlist, ditem, 0, battle_config.finding_ore_rate/10, homkillonly || merckillonly);
 		}
 
+		if(sd){
+			for (const auto& globaldrop : global_drop_db) {
+
+				if(globaldrop.second->NoDropMap.size() && util::vector_exists(globaldrop.second->NoDropMap,sd->bl.m))
+					continue;
+
+				std::shared_ptr<s_global_drop_map> MapInfo = util::map_find(globaldrop.second->ReduceRateMap , (uint16)sd->bl.m);
+
+				int reduce_percent = 0;
+
+				if(MapInfo && MapInfo->mapindex == sd->bl.m)
+					reduce_percent = MapInfo->rate;
+
+				for(const auto& globaldropitem : globaldrop.second->items){
+
+					int16 final_rate = globaldropitem.second->rate - (globaldropitem.second->rate * reduce_percent / 100);
+					
+					if(rnd()%10000 <= final_rate){
+						struct s_mob_drop mobdrop;
+						memset(&mobdrop, 0, sizeof(struct s_mob_drop));
+						mobdrop.nameid = globaldropitem.second->itemid;
+						ditem = mob_setdropitem(&mobdrop, 1, md->mob_id);
+						mob_item_drop(md, dlist, ditem, 0, globaldropitem.second->rate, homkillonly || merckillonly);
+					}
+				}
+			}
+		}
+
 		if(sd) {
 			// process script-granted extra drop bonuses
 			t_itemid dropid = 0;

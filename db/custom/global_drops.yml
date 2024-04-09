@@ -1,0 +1,30 @@
+###########################################################################
+# Whispering Rain
+###########################################################################
+# Event Global Drop
+#
+# 0 = DROPEFFECT_NONE
+# 1 = DROPEFFECT_CLIENT
+# 2 = DROPEFFECT_BLUE_PILLAR
+# 3 = DROPEFFECT_YELLOW_PILLAR
+# 4 = DROPEFFECT_PURPLE_PILLAR
+# 5 = DROPEFFECT_GREEN_PILLAR
+# 6 = DROPEFFECT_RED_PILLAR
+###########################################################################
+
+Header:
+  Type: GLOBAL_DROP_DB
+  Version: 1
+
+Body:
+  - Name: Global Drop # ไม่มีความสำคัญ
+    ReduceMap:
+      - Map: prontera
+        Rate: 50 # หน่วยเป็น %
+    NoDropMap:
+      - Map: morocc
+      - Map: geffen  
+    TargetItems:
+      - Item: Blade # ชื่อ AegisName
+        Rate: 10000 # % ดรอป
+        DropEffect: DROPEFFECT_BLUE_PILLAR # เสาดรอป

@@ -568,6 +568,7 @@ public:
 		bool collection_open;
 		bool recal_vip_time;
 		unsigned int afk;
+		bool craft_barter;
 	} state;
 	struct {
 		unsigned char no_weapon_damage, no_magic_damage, no_misc_damage;
@@ -582,6 +583,7 @@ public:
 		unsigned int bonus_coma : 1;
 		unsigned int no_mado_fuel : 1; // Disable Magic_Gear_Fuel consumption [Secret]
 		unsigned int no_walk_delay : 1;
+		unsigned int greed_pickup : 1;
 	} special_state;
 	uint32 login_id1, login_id2;
 	uint64 class_;	//This is the internal job ID used by the map server to simplify comparisons/queries/etc. [Skotlex]
@@ -647,6 +649,7 @@ public:
 	uint16 skill_id_song, skill_lv_song;
 	short cook_mastery; // range: [0,1999] [Inkfish]
 	struct skill_cooldown_entry * scd[MAX_SKILLCOOLDOWN]; // Skill Cooldown
+	std::vector<skill_cooldown_entry> shd; // hard delay
 	uint16 cloneskill_idx, ///Stores index of copied skill by Intimidate/Plagiarism
 		reproduceskill_idx; ///Stores index of copied skill by Reproduce
 	int menuskill_id, menuskill_val, menuskill_val2;
@@ -1071,6 +1074,9 @@ public:
 	int vip_timer_tid;
 
 	int goldpc_tid;
+
+	t_tick pickup_motion;
+	t_tick attack_motion;	
 };
 
 extern struct eri *pc_sc_display_ers; /// Player's SC display table

@@ -17,6 +17,10 @@ Name : Minor trap damage fixes (#8230)
 - Gold PC (online ได้พ้อย)
 - Boss/Mini Boss Card Log
 - Mapflag No Equip (mapflag กำหนดของสวมใส่หรือห้ามใส่)
+- Barter Craft
+- Anti Motion Edit + Hard Delay (กันตัดโม)
+- Global Drop
+- Max Resist (กำหนด cap กันต่างๆ)
 
 -- FIX --
 - DEF negative (แก้ DEF ติดลบ หากใช้งานโหมด pre-re)

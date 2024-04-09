@@ -6330,6 +6330,11 @@ bool pc_takeitem(map_session_data *sd,struct flooritem_data *fitem)
 	if (!check_distance_bl(&fitem->bl, &sd->bl, 2) && sd->ud.skill_id!=BS_GREED)
 		return false;	// Distance is too far
 
+	if(battle_config.pickup_item_motion_time && sd->special_state.greed_pickup == 0){
+		if(DIFF_TICK(sd->pickup_motion,gettick()) > 0)
+			return false;
+	}
+
 	if (sd->sc.cant.pickup)
 		return false;
 
@@ -6382,6 +6387,9 @@ bool pc_takeitem(map_session_data *sd,struct flooritem_data *fitem)
 		(!p || !(p->party.item&2)) // Somehow, if party's pickup distribution is 'Even Share', no announcemet
 		)
 		intif_broadcast_obtain_special_item(sd, fitem->item.nameid, fitem->mob_id, ITEMOBTAIN_TYPE_MONSTER_ITEM);
+
+	if(battle_config.pickup_item_motion_time && sd->special_state.greed_pickup == 0)
+		sd->pickup_motion = gettick() + battle_config.pickup_item_motion_time;
 
 	map_clearflooritem(&fitem->bl);
 	return true;
