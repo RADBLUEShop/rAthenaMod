@@ -37,6 +37,9 @@ std::vector<extended_vending> extended_vending_lists;
 
 struct s_roulette_db rd;
 
+std::vector<s_ai_item_buff> ai_item_buff;
+std::vector<t_itemid> ai_item_buff_reset;
+
 static void itemdb_jobid2mapid(uint64 bclass[3], e_mapid jobmask, bool active);
 
 const std::string ItemDatabase::getDefaultLocation() {
@@ -1258,6 +1261,17 @@ void ItemDatabase::loadingFinished(){
 			ShowWarning("Buying/Selling [%d/%d] price of %s (%u) allows Zeny making exploit through buying/selling at discounted/overcharged prices! Defaulting Sell to 1 Zeny.\n", item->value_buy, item->value_sell, item->name.c_str(), item->nameid);
 			item->value_sell = 1;
 		}
+
+		if (item->type == IT_HEALING && battle_config.max_sale_healing && item->value_sell > battle_config.max_sale_healing)
+			item->value_sell = battle_config.max_sale_healing;
+		else if (item->type == IT_USABLE && battle_config.max_sale_usable && item->value_sell > battle_config.max_sale_usable)
+			item->value_sell = battle_config.max_sale_usable;
+		else if (item->type == IT_WEAPON && battle_config.max_sale_weapon && item->value_sell > battle_config.max_sale_weapon)
+			item->value_sell = battle_config.max_sale_weapon;
+		else if (item->type == IT_ARMOR && battle_config.max_sale_armor && item->value_sell > battle_config.max_sale_armor)
+			item->value_sell = battle_config.max_sale_armor;
+		else if (battle_config.max_sale_etc && item->value_sell > battle_config.max_sale_etc)
+			item->value_sell = battle_config.max_sale_etc;
 
 		// Shields need to have a view ID to be able to be recognized by ST_SHIELD check in skill.cpp
 		if( item->type == IT_ARMOR && ( item->equip & EQP_SHIELD ) != 0 && item->look == 0 ){
@@ -5009,6 +5023,58 @@ int item_charm_max_stack(t_itemid nameid, int amount)
 	return ret;
 }
 
+
+/**
+ */
+static bool itemdb_read_ai_item_buff(char* fields[], size_t columns, size_t current)
+{
+	t_itemid itemid = atoi(fields[0]);
+	t_tick duration = atoi(fields[1]);
+	bool reset = false;
+
+	if(atoi(fields[2]) == 1){
+		reset = true;
+	}else{
+		reset = false;
+	}
+
+	if(!item_db.exists(itemid)){
+		ShowWarning("itemdb_read_ai_item_buff: Item ID %d not found.\n", itemid);
+		return false;
+	}
+
+	std::shared_ptr<item_data> id = item_db.find(itemid);
+
+	if( id->type != IT_HEALING && id->type != IT_USABLE ){
+		ShowWarning("itemdb_read_ai_item_buff: Item ID %d is not a healing item or usable item.\n", itemid);
+		return false;
+	}
+
+	bool found = false;
+	for (const auto& entry : ai_item_buff) {
+		if (entry.itemid == itemid) {
+			found = true;
+			break;
+		}
+	}
+
+	if (found) {
+		ShowWarning("itemdb_read_ai_item_buff: Item ID %d is already in the list.\n", itemid);
+		return false;
+	}
+
+	struct s_ai_item_buff entry = {};
+	entry.itemid = itemid;
+	entry.duration = duration;
+	entry.resetwhendead = reset;
+	ai_item_buff.push_back(entry);
+
+	if(reset)
+		ai_item_buff_reset.push_back(itemid);
+
+	return true;
+}
+
 /**
 * Read all item-related databases
 */
@@ -5042,6 +5108,7 @@ static void itemdb_read(void) {
 
 		sv_readdb(dbsubpath2, "item_noequip.txt",       ',', 2, 2, -1, &itemdb_read_noequip, i > 0);
 		sv_readdb(dbsubpath1, "custom/extended_vending.txt",       ',', 2, 2, -1, &itemdb_read_extended_vending, i > 0);
+		sv_readdb(dbsubpath1, "custom/ai_item_buff.txt", ',', 3, 3, -1, &itemdb_read_ai_item_buff,i > 0);
 
 		aFree(dbsubpath1);
 		aFree(dbsubpath2);
@@ -5059,7 +5126,7 @@ static void itemdb_read(void) {
 	collection_combo_db.load();
 
 	if (battle_config.feature_roulette)
-		itemdb_parse_roulette_db();
+		itemdb_parse_roulette_db();	
 }
 
 /*==========================================
@@ -5159,6 +5226,8 @@ void do_final_itemdb(void) {
 		itemdb_roulette_free();
 
 	extended_vending_lists = {};
+	ai_item_buff = {};
+	ai_item_buff_reset = {};		
 }
 
 /**

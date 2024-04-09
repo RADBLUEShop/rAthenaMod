@@ -1,0 +1,20 @@
+###########################################################################
+#
+# Whispering Rain
+#
+###########################################################################
+
+Header:
+  Type: REFINE_PASS_DB
+  Version: 1
+
+Body:
+  - RefineLevel: 5
+    Icon: EFST_REFINE_PASS_LVL_5
+    Script: |
+      bonus bStr,5;
+
+  - RefineLevel: 6
+    Icon: EFST_REFINE_PASS_LVL_6
+    Script: |
+      bonus bStr,6;

@@ -7836,15 +7836,10 @@ ACMD_FUNC(mobinfo)
 
 			sprintf(atcmd_output2, " - %s  %02.02f%%", item_db.create_item_link( id ).c_str(), (float)droprate / 100);
 			strcat(atcmd_output, atcmd_output2);
-			if (++j % 3 == 0) {
-				clif_displaymessage(fd, atcmd_output);
-				strcpy(atcmd_output, " ");
-			}
-		}
-		if (j == 0)
-			clif_displaymessage(fd, msg_txt(sd,1246)); // This monster has no drops.
-		else if (j % 3 != 0)
 			clif_displaymessage(fd, atcmd_output);
+			strcpy(atcmd_output, " ");
+		}
+		clif_displaymessage(fd, atcmd_output);
 		// mvp
 		if( mob->get_bosstype() == BOSSTYPE_MVP ){
 			float mvppercent, mvpremain;
@@ -10959,6 +10954,164 @@ ACMD_FUNC(setcard)
 	return 0;
 }
 
+/*==========================================
+* @afk "<Message>"
+*==========================================*/
+ACMD_FUNC(afk) {
+	nullpo_retr(-1, sd);
+
+	char msg[CHAT_SIZE_MAX];
+	
+	if (pc_isdead(sd)) {
+		clif_displaymessage(fd, msg_txt(sd, 1710));
+		return -1;
+	}
+
+	if (sd->state.vending || sd->state.buyingstore) {
+		clif_displaymessage(fd, msg_txt(sd, 1711));
+		return 1;
+	}
+
+	{
+		int i = 0, j = 0, l = strlen(message) + 1;
+		char *temp = (char*)aMalloc(strlen(message) + 1);
+
+		if (message[i] != '\"') {
+			clif_displaymessage(fd, msg_txt(sd, 1713));
+			clif_displaymessage(fd, msg_txt(sd, 1712));
+			return -1;
+		}
+
+		i++;
+		j = 0;
+
+		while (i <= l) {
+			if (message[i] == '\"' || message[i] == '\0')
+				break;
+			else
+				temp[j++] = message[i];
+			i++;
+		}
+
+		if (message[i] != '\"') {
+			clif_displaymessage(fd, msg_txt(sd, 1714));
+			clif_displaymessage(fd, msg_txt(sd, 1712));
+			return -1;
+		}
+
+		temp[j] = '\0';
+		safestrncpy(msg, temp, CHAT_SIZE_MAX);
+		aFree(temp);
+	}
+
+	if (map_getmapflag(sd->bl.m, MF_AUTOTRADE) == battle_config.autotrade_mapflag && !map_getmapflag(sd->bl.m, MF_NOAFK)) {
+
+		if (map_getmapflag(sd->bl.m, MF_PVP) || map_getmapflag(sd->bl.m, MF_GVG)) {
+			clif_displaymessage(fd, msg_txt(sd, 1715));
+			return -1;
+		}
+
+		sd->state.autotrade = 1;
+		sd->state.afk = 1;
+		sd->state.block_action |= PCBLOCK_IMMUNE;
+		pc_setsit(sd);
+		skill_sit(sd, 1);
+		clif_sitting(&sd->bl);
+		clif_changelook(&sd->bl, LOOK_HEAD_TOP, ITEMID_AFK_HAT);
+		clif_specialeffect(&sd->bl, 234, AREA);   
+						
+		if (battle_config.afk_timeout) {
+			int timeout = atoi(message);
+			status_change_start(NULL, &sd->bl, SC_AUTOTRADE, 10000, 0, 0, 0, 0, ((timeout > 0) ? min(timeout, battle_config.afk_timeout) : battle_config.afk_timeout) * 60000, 0);
+		}
+
+		safestrncpy(sd->message_to_afk, msg, CHAT_SIZE_MAX);
+		channel_pcquit(sd, 0xF); //leave all chan
+		clif_authfail_fd(sd->fd, 15);
+		chrif_save(sd, CSAVE_AUTOTRADE);
+
+	} else {
+		clif_displaymessage(fd, msg_txt(sd, 1706));
+		return -1;
+	}
+
+	return 0;
+}
+
+static int buildin_itemmap_sub(block_list *bl, va_list ap) {
+	int nameid, amount, bound;
+
+	nameid = va_arg(ap, int);
+	amount = va_arg(ap, int);
+	bound = va_arg(ap, int);
+
+	struct item item_tmp = {};
+
+	item_tmp.nameid = nameid;
+	item_tmp.identify = 1;
+	item_tmp.bound = bound;
+
+	std::shared_ptr<item_data> item_data = item_db.find(nameid);
+
+	char output[CHAT_SIZE_MAX];
+	sprintf(output, msg_txt(NULL, 1782), item_db.create_item_link(item_data).c_str(), amount);
+	clif_messagecolor(bl, color_table[COLOR_CYAN], output, false, SELF);
+
+	pc_additem((map_session_data *)bl, &item_tmp, amount, LOG_TYPE_COMMAND);
+	return 0;
+}
+
+/*==========================================
+ * @itemmap command (usage: @itemmap <itemid> <quantity>)
+ *------------------------------------------*/
+ACMD_FUNC(itemmap)
+{
+	char item_name[100];
+	int number = 0, bound = BOUND_NONE;
+	char flag = 0;
+
+	nullpo_retr(-1, sd);
+	memset(item_name, '\0', sizeof(item_name));
+
+	parent_cmd = atcommand_alias_db.checkAlias(command+1);
+
+	if (!strcmpi(parent_cmd,"itemmapbound")) {
+		if (!message || !*message || (
+			sscanf(message, "\"%99[^\"]\" %11d %11d", item_name, &number, &bound) < 3 &&
+			sscanf(message, "%99s %11d %11d", item_name, &number, &bound) < 3))
+		{
+			clif_displaymessage(fd, "(usage: @itemmap <itemid> <quantity>)"); // Please enter an item name or ID (usage: @item <item name/ID> <quantity> <bound_type>).
+			clif_displaymessage(fd, msg_txt(sd,298)); // Invalid bound type
+			return -1;
+		}
+		if( bound <= BOUND_NONE || bound >= BOUND_MAX ) {
+			clif_displaymessage(fd, msg_txt(sd,298)); // Invalid bound type
+			return -1;
+		}
+	} else if (!message || !*message || (
+		sscanf(message, "\"%99[^\"]\" %11d", item_name, &number) < 1 &&
+		sscanf(message, "%99s %11d", item_name, &number) < 1
+	)) {
+		clif_displaymessage(fd, msg_txt(sd,983)); // Please enter an item name or ID (usage: @item <item name/ID> <quantity>).
+		return -1;
+	}
+
+	std::shared_ptr<item_data> item_data = item_db.search_aegisname(item_name);
+
+	if( item_data == nullptr )
+		item_data = item_db.find(strtoul(item_name,nullptr,10));
+
+	if (item_data == nullptr)
+		return -1;
+
+	char output[CHAT_SIZE_MAX];
+	sprintf(output, msg_txt(NULL, 1781), item_db.create_item_link(item_data).c_str(),mapindex_id2name(sd->mapindex),number);
+	clif_broadcast(&sd->bl, output, strlen(output) + 1, BC_BLUE, SELF);
+
+	map_foreachinmap(buildin_itemmap_sub, sd->bl.m, BL_PC,item_data->nameid, number, bound);
+	return 0;
+}
+
 #include <custom/atcommand.inc>
 
 /**
@@ -11287,6 +11440,9 @@ void atcommand_basecommands(void) {
 		ACMD_DEFR(enchantgradeui, ATCMD_NOCONSOLE|ATCMD_NOAUTOTRADE),
 		ACMD_DEFR(roulette, ATCMD_NOCONSOLE|ATCMD_NOAUTOTRADE),
 		ACMD_DEF(setcard),
+		ACMD_DEF(afk),
+		ACMD_DEF(itemmap),
+		ACMD_DEF2("itemmapbound",itemmap),		
 	};
 	AtCommandInfo* atcommand;
 	int i;

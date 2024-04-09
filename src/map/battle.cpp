@@ -11398,6 +11398,64 @@ static const struct _battle_data {
 	{ "max_collection_count",				&battle_config.max_collection_count,			0,      0,      INT_MAX,		},
 	{ "collection_max_stored",				&battle_config.collection_max_stored,			1,      1,      INT_MAX,		},
 
+	{ "feature.goldpc_active",              &battle_config.feature_goldpc_active,           1,      0,      1,              },
+	{ "feature.goldpc_time",                &battle_config.feature_goldpc_time,          3600,      0,   3600,              },
+	{ "feature.goldpc_max_points",          &battle_config.feature_goldpc_max_points,     300,      0,    300,              },
+	{ "feature.goldpc_vip",                 &battle_config.feature_goldpc_vip,              1,      0,      1,              },
+
+	// MvP and Mini-Boss Card Ad and Log System [Bad]
+	{ "announcement_and_log_system",        &battle_config.announcement_and_log_system,     1,      0,      1,              },
+	{ "mvp_card_announce_system",           &battle_config.mvp_card_announce_system,        1,      0,      1,              },
+	{ "mvp_card_announce",                  &battle_config.mvp_card_announce,               1,      0,      1,              },
+	{ "dropped_mvp_card_log",               &battle_config.dropped_mvp_card_log,            1,      0,      1,              },
+	{ "set_drop_announce_color",            &battle_config.set_drop_announce_color,         0xFFBB00,      0,INT_MAX,       },
+	{ "mini_boss_card_announce_system",     &battle_config.mini_boss_card_announce_system,  1,      0,      1,              },
+	{ "mini_boss_card_announce",            &battle_config.mini_boss_card_announce,         1,      0,      1,              },
+	{ "dropped_mini_boss_card_log",         &battle_config.dropped_mini_boss_card_log,      1,      0,      1,              },
+	{ "set_drop_card_announce_color",       &battle_config.set_drop_card_announce_color,    0xFFBB00,      0,INT_MAX,       },
+
+	{ "afk_timeout",                        &battle_config.afk_timeout,                     0,      0,      INT_MAX,        },
+
+	{ "max_sale_healing",					&battle_config.max_sale_healing,				1000,   0,   	INT_MAX,        },
+	{ "max_sale_usable",					&battle_config.max_sale_usable,                	1000,   0,   	INT_MAX,        },
+	{ "max_sale_weapon",					&battle_config.max_sale_weapon,                	1000,   0,   	INT_MAX,        },
+	{ "max_sale_armor",						&battle_config.max_sale_armor,                	1000,   0,   	INT_MAX,        },
+	{ "max_sale_etc",						&battle_config.max_sale_etc,                	1000,   0,   	INT_MAX,        },
+
+	//autoattack
+	{ "autoattack_skillheal",				&battle_config.autoattack_skillheal,			1,		0,		1,				},
+	{ "autoattack_item_potion",				&battle_config.autoattack_item_potion,			1,		0,		1,				},
+	{ "autoattack_sittorest",				&battle_config.autoattack_sittorest,			1,		0,		1,				},
+	{ "autoattack_skill_attack",			&battle_config.autoattack_skill_attack,			1,		0,		1,				},
+	{ "autoattack_skill_buff",				&battle_config.autoattack_skill_buff,			1,		0,		1,				},
+	{ "autoattack_item_buff",				&battle_config.autoattack_item_buff,			1,		0,		1,				},
+	{ "autoattack_teleport",				&battle_config.autoattack_teleport,				1,		0,		1,				},
+	{ "autoattack_item_pickup",				&battle_config.autoattack_item_pickup,			1,		0,		1,				},
+	{ "autoattack_mselection",				&battle_config.autoattack_mselection,			1,      1,      1,      		},
+	{ "autoattack_item_range_detection",	&battle_config.autoattack_item_range_detection,	15,		0,		30,				},
+	{ "autoattack_mob_detection",			&battle_config.autoattack_mob_detection,		15,     1,      30,      		},
+	{ "autoattack_move",					&battle_config.autoattack_move,					7,      1,      20,      		},
+	{ "autoattack_move_type",				&battle_config.autoattack_move_type,			0,		0,		1,				},
+	{ "autoattack_interval_timer",			&battle_config.autoattack_interval_timer,		100,	0,		INT_MAX,		},
+	{ "autoattack_pickup_delay",			&battle_config.autoattack_pickup_delay,			100,	0,		INT_MAX,		},
+	{ "autoattack_clean_logout",			&battle_config.autoattack_clean_logout,			0,		0,		1,				},
+	{ "autoattack_hateffect",				&battle_config.autoattack_hateffect,			0,		0,		INT_MAX,		},
+	{ "autoattack_skill_rate_default",		&battle_config.autoattack_skill_rate_default,	0,		0,		100,			},
+	{ "autoattack_reduce_droprate",			&battle_config.autoattack_reduce_droprate,		0,		0,		100,  			},
+	{ "autoattack_reduce_mode",				&battle_config.autoattack_reduce_mode,			0,		0,		1|2|4|8|16|32,  },	
+
+	// max % resistance
+	{ "max_subele_resist",					&battle_config.max_subele_resist,				0,      0,      100,			},
+	{ "max_subdefele_resist",				&battle_config.max_subdefele_resist,			0,      0,      100,			},
+	{ "max_magicsubdefele_resist",			&battle_config.max_magicsubdefele_resist,		0,      0,      100,			},
+	{ "max_subrace_resist",					&battle_config.max_subrace_resist,				0,      0,      100,			},
+	{ "max_subclass_resist",				&battle_config.max_subclass_resist,				0,      0,      100,			},
+	{ "max_subsize_resist",					&battle_config.max_subsize_resist,				0,      0,      100,			},
+	{ "max_short_attack_def_rate",			&battle_config.max_short_attack_def_rate,		0,      0,      100,			},
+	{ "max_long_attack_def_rate",			&battle_config.max_long_attack_def_rate,		0,      0,      100,			},
+	{ "max_magic_def_rate",					&battle_config.max_magic_def_rate,				0,      0,      100,			},
+	{ "max_misc_def_rate",					&battle_config.max_misc_def_rate,				0,      0,      100,			},
+
 #include <custom/battle_config_init.inc>
 };
 

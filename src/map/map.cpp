@@ -4548,6 +4548,9 @@ int map_getmapflag_sub(int16 m, enum e_mapflag mapflag, union u_mapflag_args *ar
 				default:
 					return mapdata->getMapFlag(mapflag);
 			}
+			break;
+		case MF_REDUCEDROP:
+			return mapdata->reduce_drop_percent;
 		default:
 			return mapdata->getMapFlag(mapflag);
 	}
@@ -4812,6 +4815,16 @@ bool map_setmapflag_sub(int16 m, enum e_mapflag mapflag, bool status, union u_ma
 			}
 			mapdata->setMapFlag(mapflag, status);
 			break;
+		case MF_REDUCEDROP:
+			if (!status)
+				mapdata->reduce_drop_percent = 0;
+			else {
+				nullpo_retr(false, args);
+
+				mapdata->reduce_drop_percent = cap_value(args->flag_val, 0, 100);
+			} 
+			mapdata->setMapFlag(mapflag, status);
+			break;			
 		default:
 			mapdata->setMapFlag(mapflag, status);
 			break;

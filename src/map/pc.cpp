@@ -2242,9 +2242,178 @@ bool pc_authok(map_session_data *sd, uint32 login_id2, time_t expiration_time, i
 		clif_updatestatus(sd, SP_JOBEXP);
 	}
 
+	pc_aa_load(sd);
+
 	// Request all registries (auth is considered completed whence they arrive)
 	intif_request_registry(sd,7);
 	return true;
+}
+
+
+void pc_aa_load(map_session_data* sd)
+{
+	nullpo_retv(sd);
+
+	int type;
+	t_tick tick = gettick();
+
+	// aa_common_config
+	if (Sql_Query(mmysql_handle,"SELECT `stopmelee`,`pickup_item_config`,`aggressive_behavior`,`autositregen_conf`,"
+		"`autositregen_maxhp`,`autositregen_minhp`,`autositregen_maxsp`,`autositregen_minsp`,`tp_use_teleport`,"
+		"`tp_use_flywing`,`tp_min_hp`,`tp_delay_nomobmeet`,`skill_rate` FROM `aa_common_config` WHERE `char_id` = %d",
+		sd->status.char_id ) != SQL_SUCCESS ){
+		Sql_ShowDebug(mmysql_handle);
+		return;
+	}
+
+	if(Sql_NumRows(mmysql_handle)){
+		while (SQL_SUCCESS == Sql_NextRow(mmysql_handle)) {
+			char* data;
+			Sql_GetData(mmysql_handle, 0,  &data, NULL); sd->aa.stopmelee 				 	= atoi(data);
+			Sql_GetData(mmysql_handle, 1,  &data, NULL); sd->aa.pickup_item_config 		 	= atoi(data);
+			Sql_GetData(mmysql_handle, 2,  &data, NULL); sd->aa.mobs.aggressive_behavior 	= atoi(data);
+			Sql_GetData(mmysql_handle, 3,  &data, NULL); sd->aa.autositregen.is_active		= atoi(data);
+			Sql_GetData(mmysql_handle, 4,  &data, NULL); sd->aa.autositregen.max_hp 		= atoi(data);
+			Sql_GetData(mmysql_handle, 5,  &data, NULL); sd->aa.autositregen.min_hp 		= atoi(data);
+			Sql_GetData(mmysql_handle, 6,  &data, NULL); sd->aa.autositregen.max_sp 		= atoi(data);
+			Sql_GetData(mmysql_handle, 7,  &data, NULL); sd->aa.autositregen.min_sp 		= atoi(data);
+			Sql_GetData(mmysql_handle, 8,  &data, NULL); sd->aa.teleport.use_teleport 		= atoi(data);
+			Sql_GetData(mmysql_handle, 9,  &data, NULL); sd->aa.teleport.use_flywing 		= atoi(data);
+			Sql_GetData(mmysql_handle, 10, &data, NULL); sd->aa.teleport.min_hp 			= atoi(data);
+			Sql_GetData(mmysql_handle, 11, &data, NULL); sd->aa.teleport.delay_nomobmeet 	= atoi(data);
+			Sql_GetData(mmysql_handle, 12, &data, NULL); sd->aa.skill_use_rate 				= atoi(data);
+		}
+	} else {
+		sd->aa.stopmelee 					= 0;	
+		sd->aa.pickup_item_config 			= 0;
+		sd->aa.skill_use_rate				= battle_config.autoattack_skill_rate_default;
+		sd->aa.mobs.aggressive_behavior 	= 0;
+		sd->aa.autositregen.is_active 		= 0;
+		sd->aa.autositregen.max_hp 			= 0;
+		sd->aa.autositregen.min_hp 			= 0;
+		sd->aa.autositregen.max_sp 			= 0;
+		sd->aa.autositregen.min_sp 			= 0;
+		sd->aa.teleport.use_teleport 		= 0;
+		sd->aa.teleport.use_flywing 		= 0;
+		sd->aa.teleport.min_hp 				= 0;
+		sd->aa.teleport.delay_nomobmeet 	= 0;
+	}
+
+	Sql_FreeResult(mmysql_handle);
+
+	// aa_items
+	if (Sql_Query(mmysql_handle,"SELECT `type`,`item_id`,`min_hp`,`min_sp` FROM `aa_items` WHERE `char_id` = %d ",sd->status.char_id ) != SQL_SUCCESS ){
+		Sql_ShowDebug(mmysql_handle);
+		return;
+	}
+
+	struct s_autobuffitems autobuffitems = {};
+	struct s_autopotion autopotion = {};
+	struct s_autoheal autoheal = {};
+	struct s_autobuffskills autobuffskills = {};
+	struct s_autoattackskills autoattackskills = {};
+
+	if(Sql_NumRows(mmysql_handle)){
+		while (SQL_SUCCESS == Sql_NextRow(mmysql_handle)) {
+			char* data;
+			Sql_GetData(mmysql_handle, 0, &data, NULL); type = atoi(data);
+
+			switch(type){
+
+				case 0:
+					autobuffitems.is_active = 1;
+					Sql_GetData(mmysql_handle, 1, &data, NULL); autobuffitems.item_id 	= atoi(data);
+					autobuffitems.last_use = 0;
+					autobuffitems.delay = 0;
+					sd->aa.autobuffitems.push_back(autobuffitems);
+					break;
+
+				case 1:
+					autopotion.is_active = 1;
+					Sql_GetData(mmysql_handle, 1, &data, NULL); autopotion.item_id 	= atoi(data);
+					Sql_GetData(mmysql_handle, 2, &data, NULL); autopotion.min_hp 	= atoi(data);
+					Sql_GetData(mmysql_handle, 3, &data, NULL); autopotion.min_sp 	= atoi(data);
+					sd->aa.autopotion.push_back(autopotion);
+					break;
+
+				case 2:
+					t_itemid nameid = 0;
+					Sql_GetData(mmysql_handle, 1, &data, NULL); nameid = atoi(data);
+					sd->aa.pickup_item_id.push_back(nameid);
+					break;
+			}
+		}
+	}
+
+	Sql_FreeResult(mmysql_handle);
+
+	// aa_mobs
+	if (Sql_Query(mmysql_handle,"SELECT `mob_id` FROM `aa_mobs` WHERE `char_id` = %d ", sd->status.char_id ) != SQL_SUCCESS ){
+		Sql_ShowDebug(mmysql_handle);
+		return;
+	}
+
+	if(Sql_NumRows(mmysql_handle)){
+		while (SQL_SUCCESS == Sql_NextRow(mmysql_handle)) {
+			char* data;
+			uint32 mob_id;
+			Sql_GetData(mmysql_handle, 0, &data, NULL); mob_id = atoi(data);
+			sd->aa.mobs.id.push_back(mob_id);
+		}
+	}
+
+	Sql_FreeResult(mmysql_handle);
+
+	// aa_skills
+	if (Sql_Query(mmysql_handle,"SELECT `type`,`skill_id`,`skill_lv`,`min_hp` FROM `aa_skills` WHERE `char_id` = %d ", sd->status.char_id ) != SQL_SUCCESS ){
+		Sql_ShowDebug(mmysql_handle);
+		return;
+	}
+
+	if(Sql_NumRows(mmysql_handle)){
+		while (SQL_SUCCESS == Sql_NextRow(mmysql_handle)) {
+			char* data;
+			Sql_GetData(mmysql_handle, 0, &data, NULL); type = atoi(data);
+			switch(type){
+
+				case 0:
+					autoheal.is_active = 1;
+					Sql_GetData(mmysql_handle, 1, &data, NULL); autoheal.skill_id = atoi(data);
+					Sql_GetData(mmysql_handle, 2, &data, NULL); autoheal.skill_lv = atoi(data);
+					Sql_GetData(mmysql_handle, 3, &data, NULL); autoheal.min_hp = atoi(data);
+					autoheal.last_use = 1;
+					sd->aa.autoheal.push_back(autoheal);
+					break;
+
+				case 1:
+					autobuffskills.is_active = 1;
+					Sql_GetData(mmysql_handle, 1, &data, NULL); autobuffskills.skill_id = atoi(data);
+					Sql_GetData(mmysql_handle, 2, &data, NULL); autobuffskills.skill_lv = atoi(data);
+					autobuffskills.last_use = 1;
+					sd->aa.autobuffskills.push_back(autobuffskills);
+					break;
+
+				case 2:
+					autoattackskills.is_active = 1;
+					Sql_GetData(mmysql_handle, 1, &data, NULL); autoattackskills.skill_id = atoi(data);
+					Sql_GetData(mmysql_handle, 2, &data, NULL); autoattackskills.skill_lv = atoi(data);
+					autoattackskills.last_use = 1;
+					sd->aa.autoattackskills.push_back(autoattackskills);
+					break;
+			}
+		}
+	}
+
+	Sql_FreeResult(mmysql_handle);
+
+	sd->aa.last_hit 		= tick;
+	sd->aa.last_teleport 	= tick;
+	sd->aa.last_move 		= tick;
+	sd->aa.last_attack 		= tick;
+	sd->aa.last_hit 		= tick;
+	sd->aa.attack_target_id = 0;
+	sd->aa.target_id 		= 0;
+	sd->aa.itempick_id 		= 0;
 }
 
 /*==========================================
@@ -2403,8 +2572,6 @@ void pc_reg_received(map_session_data *sd)
 	intif_storage_request(sd,TABLE_CART, 0, STOR_MODE_ALL); // Request cart data
 	intif_storage_request(sd,TABLE_INVENTORY, 0, STOR_MODE_ALL); // Request inventory data
 
-	load_char_bonus_data(*sd); // Load bonus data
-
 	// Restore IM_CHAR instance to the player
 	for (const auto &instance : instances) {
 		if (instance.second->mode == IM_CHAR && instance.second->owner_id == sd->status.char_id) {
@@ -2423,6 +2590,15 @@ void pc_reg_received(map_session_data *sd)
 	// Before those clients you could send out the instance info even when the client was still loading the map, afterwards you need to send it later
 	clif_instance_info( *sd );
 #endif
+
+	if( battle_config.feature_goldpc_active && pc_readreg2( sd, GOLDPC_POINT_VAR ) < battle_config.feature_goldpc_max_points && !sd->state.autotrade ){
+		sd->goldpc_tid = add_timer( gettick() + ( battle_config.feature_goldpc_time - pc_readreg2( sd, GOLDPC_SECONDS_VAR ) ) * 1000, pc_goldpc_update, sd->bl.id, (intptr_t)nullptr );
+#ifndef VIP_ENABLE
+		clif_goldpc_info( *sd );
+#endif
+	}else{
+		sd->goldpc_tid = INVALID_TIMER;
+	}
 
 	// pet
 	if (sd->status.pet_id > 0)
@@ -2484,6 +2660,7 @@ void pc_reg_received(map_session_data *sd)
 #if PACKETVER_SUPPORTS_SALES
 	sale_load_pc(sd);
 #endif
+	load_char_bonus_data(*sd); // Load bonus data
 
 	channel_autojoin(sd);
 }
@@ -2565,6 +2742,38 @@ static bool pc_grant_allskills(map_session_data *sd, bool addlv) {
 		}
 	}
 	return true;
+}
+
+TIMER_FUNC(pc_goldpc_update){
+	map_session_data* sd = map_id2sd( id );
+
+	if( sd == nullptr ){
+		return 0;
+	}
+
+	sd->goldpc_tid = INVALID_TIMER;
+
+	// Check if feature is still active
+	if( !battle_config.feature_goldpc_active ){
+		return 0;
+	}
+
+	// TODO: add mapflag to disable?
+
+	int64 points = pc_readparam( sd, SP_GOLDPC_POINTS );
+
+	if( battle_config.feature_goldpc_vip && pc_isvip( sd ) ){
+		points += 2;
+	}else{
+		points += 1;
+	}
+
+	// Reset the seconds
+	pc_setreg2( sd, GOLDPC_SECONDS_VAR, 0 );
+	// Update the points and trigger a new timer if necessary
+	pc_setparam( sd, SP_GOLDPC_POINTS, points );
+
+	return 0;
 }
 
 /*==========================================
@@ -6827,7 +7036,7 @@ enum e_setpos pc_setpos(map_session_data* sd, unsigned short mapindex, int x, in
 		return SETPOS_MAPINDEX;
 	}
 
-	if ( sd->state.autotrade && (sd->vender_id || sd->buyer_id) ) // Player with autotrade just causes clif glitch! @ FIXME
+	if ( (sd->sc.getSCE(SC_AUTOATTACK) && sd->mapindex != mapindex) || (sd->state.autotrade && sd->sc.getSCE(SC_AUTOATTACK)) || (sd->state.autotrade && (sd->vender_id || sd->buyer_id)) ) // Player with autotrade just causes clif glitch! @ FIXME
 		return SETPOS_AUTOTRADE;
 
 	if( battle_config.revive_onwarp && pc_isdead(sd) ) { //Revive dead people before warping them
@@ -8263,6 +8472,16 @@ static void pc_calcexp(map_session_data *sd, t_exp *base_exp, t_exp *job_exp, st
 		if (battle_config.vip_bm_increase && pc_isvip(sd)) // Increase Battle Manual EXP rate for VIP
 			bonus += (sd->sc.getSCE(SC_EXPBOOST)->val1 / battle_config.vip_bm_increase);
 	}
+	if (sd->sc.getSCE(SC_PREMIUMSERVICE_EXPBOOST_A)) {
+		bonus += sd->sc.getSCE(SC_PREMIUMSERVICE_EXPBOOST_A)->val1;
+		if (battle_config.vip_bm_increase && pc_isvip(sd)) // Increase Battle Manual EXP rate for VIP
+			bonus += (sd->sc.getSCE(SC_PREMIUMSERVICE_EXPBOOST_A)->val1 / battle_config.vip_bm_increase);
+	}
+	if (sd->sc.getSCE(SC_PREMIUMSERVICE_EXPBOOST_S)) {
+		bonus += sd->sc.getSCE(SC_PREMIUMSERVICE_EXPBOOST_S)->val1;
+		if (battle_config.vip_bm_increase && pc_isvip(sd)) // Increase Battle Manual EXP rate for VIP
+			bonus += (sd->sc.getSCE(SC_PREMIUMSERVICE_EXPBOOST_S)->val1 / battle_config.vip_bm_increase);
+	}
 
 	if (*base_exp) {
 		t_exp exp = (t_exp)(*base_exp + ((double)*base_exp * ((bonus + vip_bonus_base) / 100.)));
@@ -8272,6 +8491,10 @@ static void pc_calcexp(map_session_data *sd, t_exp *base_exp, t_exp *job_exp, st
 	// Give JEXPBOOST for quests even if src is NULL.
 	if (sd->sc.getSCE(SC_JEXPBOOST))
 		bonus += sd->sc.getSCE(SC_JEXPBOOST)->val1;
+	if (sd->sc.getSCE(SC_PREMIUMSERVICE_JEXPBOOST_A))
+		bonus += sd->sc.getSCE(SC_PREMIUMSERVICE_JEXPBOOST_A)->val1;
+	if (sd->sc.getSCE(SC_PREMIUMSERVICE_JEXPBOOST_S))
+		bonus += sd->sc.getSCE(SC_PREMIUMSERVICE_JEXPBOOST_S)->val1;
 
 	if (*job_exp) {
 		t_exp exp = (t_exp)(*job_exp + ((double)*job_exp * ((bonus + vip_bonus_job) / 100.)));
@@ -9544,6 +9767,8 @@ static TIMER_FUNC(pc_respawn_timer){
  *------------------------------------------*/
 void pc_damage(map_session_data *sd,struct block_list *src,unsigned int hp, unsigned int sp, unsigned int ap)
 {
+	struct status_data *status = status_get_status_data(&sd->bl);
+
 	if (ap) clif_updatestatus(sd,SP_AP);
 	if (sp) clif_updatestatus(sd,SP_SP);
 	if (hp) clif_updatestatus(sd,SP_HP);
@@ -9568,6 +9793,17 @@ void pc_damage(map_session_data *sd,struct block_list *src,unsigned int hp, unsi
 
 	if(battle_config.prevent_logout_trigger&PLT_DAMAGE)
 		sd->canlog_tick = gettick();
+
+	if((!sd->aa.teleport.use_teleport || !sd->aa.teleport.use_flywing) && sd->aa.teleport.min_hp && (status->hp * 100 / sd->aa.teleport.min_hp) < sd->status.max_hp)
+		aa_teleport(sd);
+
+	if(!sd->aa.target_id && !sd->aa.mobs.aggressive_behavior && src->type == BL_MOB){
+		if(sd->aa.itempick_id)
+			sd->aa.itempick_id = 0; // priority to defend player
+		sd->aa.target_id = src->id;
+	}
+
+	sd->aa.last_hit = gettick();
 }
 
 TIMER_FUNC(pc_close_npc_timer){
@@ -9739,6 +9975,14 @@ int pc_dead(map_session_data *sd,struct block_list *src)
 
 	clif_party_dead( *sd );
 
+	// auto attack
+	{
+		for(auto &it : sd->aa.autobuffitems){
+			if(util::vector_exists(ai_item_buff_reset, it.item_id))
+				it.delay = 0;
+		}
+	}
+
 	pc_setparam(sd, SP_PCDIECOUNTER, sd->die_counter+1);
 	pc_setparam(sd, SP_KILLERRID, src?src->id:0);
 
@@ -9882,6 +10126,11 @@ int pc_dead(map_session_data *sd,struct block_list *src)
 		else 
 			base_penalty = 0;
 
+		t_exp a_base = 0;
+		a_base = base_penalty;
+		if (sd->sc.getSCE(SC_PREMIUMSERVICE_LIFEINSURANCE))
+			base_penalty -= (uint32)(a_base * (sd->sc.getSCE(SC_PREMIUMSERVICE_LIFEINSURANCE)->val1 / 100.));
+
 		if ((battle_config.death_penalty_maxlv&2 || !pc_is_maxjoblv(sd)) && job_penalty > 0) {
 			switch (battle_config.death_penalty_type) {
 				case 1: job_penalty = (uint32) ( pc_nextjobexp(sd) * ( job_penalty / 10000. ) ); break;
@@ -9895,6 +10144,11 @@ int pc_dead(map_session_data *sd,struct block_list *src)
 		}
 		else
 			job_penalty = 0;
+
+		t_exp a_job = 0;
+		a_job = job_penalty;
+		if (sd->sc.getSCE(SC_PREMIUMSERVICE_LIFEINSURANCE))
+			job_penalty -= (uint32)(a_job * (sd->sc.getSCE(SC_PREMIUMSERVICE_LIFEINSURANCE)->val1 / 100.));
 
 		if (base_penalty || job_penalty) {
 			short insurance_idx = pc_search_inventory(sd, ITEMID_NEW_INSURANCE);
@@ -10237,6 +10491,7 @@ int64 pc_readparam(map_session_data* sd,int64 type)
 #endif
 		case SP_CRIT_DEF_RATE: val = sd->bonus.crit_def_rate; break;
 		case SP_ADD_ITEM_SPHEAL_RATE: val = sd->bonus.itemsphealrate2; break;
+		case SP_GOLDPC_POINTS: val = pc_readreg2( sd, GOLDPC_POINT_VAR ); break;
 		default:
 			ShowError("pc_readparam: Attempt to read unknown parameter '%lld'.\n", type);
 			return -1;
@@ -10488,6 +10743,28 @@ bool pc_setparam(map_session_data *sd,int64 type,int64 val_tmp)
 		sd->cook_mastery = val;
 		pc_setglobalreg(sd, add_str(COOKMASTERY_VAR), sd->cook_mastery);
 		return true;
+	case SP_GOLDPC_POINTS:
+		val = cap_value( val, 0, battle_config.feature_goldpc_max_points );
+
+		pc_setreg2( sd, GOLDPC_POINT_VAR, val );
+
+		// If you do not check this, some funny things happen (circle logics, timer mismatches, etc...)
+		if( !sd->state.connect_new ){
+			// Make sure to always delete the timer
+			if( sd->goldpc_tid != INVALID_TIMER ){
+				delete_timer( sd->goldpc_tid, pc_goldpc_update );
+				sd->goldpc_tid = INVALID_TIMER;
+			}
+
+			// If the system is enabled and the player can still earn some points restart the timer
+			if( battle_config.feature_goldpc_active && val < battle_config.feature_goldpc_max_points && !sd->state.autotrade ){
+				sd->goldpc_tid = add_timer( gettick() + ( battle_config.feature_goldpc_time - pc_readreg2( sd, GOLDPC_SECONDS_VAR ) ) * 1000, pc_goldpc_update, sd->bl.id, (intptr_t)nullptr );
+			}
+
+			// Update the client
+			clif_goldpc_info( *sd );
+		}
+		return true;		
 	default:
 		ShowError("pc_setparam: Attempted to set unknown parameter '%lld'.\n", type);
 		return false;
@@ -16090,6 +16367,7 @@ void do_init_pc(void) {
 	add_timer_func_list(pc_autotrade_timer, "pc_autotrade_timer");
 	add_timer_func_list(pc_on_expire_active, "pc_on_expire_active");
 	add_timer_func_list(pc_macro_detector_timeout, "pc_macro_detector_timeout");
+	add_timer_func_list( pc_goldpc_update, "pc_goldpc_update" );
 
 	add_timer(gettick() + autosave_interval, pc_autosave, 0, 0);
 

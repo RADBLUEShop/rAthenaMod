@@ -41,6 +41,7 @@ const t_itemid CARD0_PET = 0x0100;
 enum item_itemid : t_itemid
 {
 	ITEMID_DUMMY						= 499,
+	ITEMID_AFK_HAT						= 471,
 	ITEMID_RED_POTION					= 501,
 	ITEMID_YELLOW_POTION				= 503,
 	ITEMID_WHITE_POTION					= 504,
@@ -3483,6 +3484,15 @@ bool item_is_collection_stack(t_itemid nameid);
 
 bool item_is_charm(t_itemid nameid);
 int item_charm_max_stack(t_itemid name, int amount);
+
+struct s_ai_item_buff {
+	t_itemid itemid;
+	t_tick duration;
+	bool resetwhendead;
+};
+
+extern std::vector<s_ai_item_buff> ai_item_buff;
+extern std::vector<t_itemid> ai_item_buff_reset;
 
 void itemdb_reload(void);
 

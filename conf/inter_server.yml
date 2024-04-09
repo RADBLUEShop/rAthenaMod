@@ -42,7 +42,7 @@ Body:
     Table: storage
 
   - ID: 1
-    Name: "Collection_Storage"
+    Name: "Collection"
     Table: collection_storage
     Max: 100
 

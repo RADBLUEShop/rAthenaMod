@@ -458,6 +458,27 @@ static int clif_send_sub(struct block_list *bl, va_list ap)
 		}
 	}
 	break;
+	case AREA_AUTOATTACK_WOS:
+	{
+		if (bl == src_bl)
+			return 0;
+
+		map_session_data *ssd = (map_session_data *)src_bl;
+
+		if(sd == ssd)
+			return 0; // don't send to self
+
+		bool src_is_autoattack = false;
+		if (ssd->sc.getSCE(SC_AUTOATTACK))
+			src_is_autoattack = true;
+
+		bool target_is_autoattack = false;
+		if (sd->sc.getSCE(SC_AUTOATTACK))
+			target_is_autoattack = true;
+
+		if(!src_is_autoattack)
+			return 0;
+	}	
 	}
 
 	if( src_bl->type == BL_NPC && npc_is_hidden_dynamicnpc( *( (struct npc_data*)src_bl ), *sd ) ){
@@ -753,6 +774,11 @@ int clif_send(const void* buf, int len, struct block_list* bl, enum send_target 
 			}
 			mapit_free(iter);
 		}
+		break;
+
+	case AREA_AUTOATTACK_WOS:
+		map_foreachinallarea(clif_send_sub, bl->m, bl->x-AREA_SIZE, bl->y-AREA_SIZE, bl->x+AREA_SIZE, bl->y+AREA_SIZE,
+			BL_PC, buf, len, bl, type);
 		break;
 
 	default:
@@ -1746,6 +1772,7 @@ int clif_spawn( struct block_list *bl, bool walking ){
 				clif_refreshlook(bl,bl->id,LOOK_ROBE,sd->status.robe,AREA);
 			clif_efst_status_change_sub(bl, bl, AREA);
 			clif_hat_effects(sd,bl,AREA);
+			clif_autoattack_effect(bl);
 		}
 		break;
 	case BL_MOB:
@@ -5127,6 +5154,7 @@ void clif_getareachar_unit( map_session_data* sd,struct block_list *bl ){
 				clif_refreshlook(&sd->bl,bl->id,LOOK_ROBE,tsd->status.robe,SELF);
 			clif_efst_status_change_sub(&sd->bl, bl, SELF);
 			clif_hat_effects(sd,bl,SELF);
+			clif_autoattack_effect(bl);
 		}
 		break;
 	case BL_MER: // Devotion Effects
@@ -6016,6 +6044,9 @@ void clif_skill_fail( map_session_data *sd, uint16 skill_id, enum useskill_fail_
 	if( !session_isActive( fd ) ){
 		return;
 	}
+
+	if(sd->sc.getSCE(SC_AUTOATTACK))
+		return;	
 
 	if(battle_config.display_skill_fail&1)
 		return; //Disable all skill failed messages
@@ -11265,6 +11296,9 @@ void clif_parse_LoadEndAck(int fd,map_session_data *sd)
 			channel_mjoin(sd); //join new map
 
 		clif_pk_mode_message(sd);
+
+		// Update the client
+		clif_goldpc_info( *sd );		
 	}
 	
 	if( sd->guild && ( battle_config.guild_notice_changemap == 2 || guild_notice ) ){
@@ -12091,10 +12125,15 @@ void clif_parse_WisMessage(int fd, map_session_data* sd)
 	}
 
 	// if player is autotrading
-	if (dstsd->state.autotrade == 1){
+	if (dstsd->state.autotrade == 1 && dstsd->state.afk == 0){
 		safesnprintf(output,sizeof(output),"%s is in autotrade mode and cannot receive whispered messages.", dstsd->status.name);
 		clif_wis_message(sd, wisp_server_name, output, strlen(output) + 1, 0);
 		return;
+	}
+
+	if (dstsd->state.afk == 1 && dstsd->state.autotrade == 1) {
+		safesnprintf(output, CHAT_SIZE_MAX, "%s", dstsd->message_to_afk);
+		clif_wis_message(sd, dstsd->status.name,  output, strlen(output) + 1, 0);
 	}
 
 	if (pc_get_group_level(sd) <= pc_get_group_level(dstsd)) {
@@ -21349,6 +21388,46 @@ void clif_hat_effects( map_session_data* sd, struct block_list* bl, enum send_ta
 #endif
 }
 
+void clif_autoattack_effect(struct block_list* bl){
+#if PACKETVER_MAIN_NUM >= 20150507 || PACKETVER_RE_NUM >= 20150429 || defined(PACKETVER_ZERO)
+
+	nullpo_retv( bl );
+
+	if(!battle_config.autoattack_hateffect)
+		return;
+
+	struct PACKET_ZC_EQUIPMENT_EFFECT* p = (struct PACKET_ZC_EQUIPMENT_EFFECT*)packet_buffer;
+
+	if(!BL_CAST(BL_PC,bl)->sc.getSCE(SC_AUTOATTACK))
+		return;
+
+	p->packetType = HEADER_ZC_EQUIPMENT_EFFECT;
+	p->packetLength = (int16)( sizeof( struct PACKET_ZC_EQUIPMENT_EFFECT ) + sizeof( int16 ));
+	p->aid = bl->id;
+	p->status = 1;
+	p->effects[BL_CAST(BL_PC,bl)->hatEffects.size()] = battle_config.autoattack_hateffect;
+
+	clif_send( p, p->packetLength, bl, AREA_AUTOATTACK_WOS);
+#endif
+}
+
+void clif_autoattack_effect_off(struct block_list* bl){
+#if PACKETVER_MAIN_NUM >= 20150507 || PACKETVER_RE_NUM >= 20150429 || defined(PACKETVER_ZERO)
+
+	nullpo_retv( bl );
+
+	struct PACKET_ZC_EQUIPMENT_EFFECT* p = (struct PACKET_ZC_EQUIPMENT_EFFECT*)packet_buffer;
+
+	p->packetType = HEADER_ZC_EQUIPMENT_EFFECT;
+	p->packetLength = (int16)( sizeof( struct PACKET_ZC_EQUIPMENT_EFFECT ) + sizeof( int16 ));
+	p->aid = bl->id;
+	p->status = 0;
+	p->effects[BL_CAST(BL_PC,bl)->hatEffects.size()] = battle_config.autoattack_hateffect;
+
+	clif_send( p, p->packetLength, bl, AREA);
+#endif
+}
+
 void clif_hat_effect_single( map_session_data* sd, uint16 effectId, bool enable ){
 #if PACKETVER_MAIN_NUM >= 20150507 || PACKETVER_RE_NUM >= 20150429 || defined(PACKETVER_ZERO)
 	nullpo_retv( sd );
@@ -25529,6 +25608,71 @@ void clif_parse_req_buy_emotion_expansion(int fd, map_session_data* sd)
 #endif
 }
 
+
+void clif_goldpc_info( map_session_data& sd ){
+#if PACKETVER_MAIN_NUM >= 20140508 || PACKETVER_RE_NUM >= 20140508 || defined(PACKETVER_ZERO)
+	const static int32 client_max_seconds = 3600;
+
+	if( battle_config.feature_goldpc_active ){
+		struct PACKET_ZC_GOLDPCCAFE_POINT p = {};
+
+		p.PacketType = HEADER_ZC_GOLDPCCAFE_POINT;
+		p.isActive = true;
+		if( battle_config.feature_goldpc_vip && pc_isvip( &sd ) ){
+			p.mode = 2;
+		}else{
+			p.mode = 1;
+		}
+		p.point = (int32)pc_readparam( &sd, SP_GOLDPC_POINTS );
+		if( sd.goldpc_tid != INVALID_TIMER ){
+			const struct TimerData* td = get_timer( sd.goldpc_tid );
+
+			if( td != nullptr ){
+				// Get the remaining milliseconds until the next reward
+				t_tick remaining = td->tick - gettick();
+
+				// Always round up to full second
+				remaining += ( remaining % 1000 );
+
+				p.playedTime = (int32)( client_max_seconds - ( remaining / 1000 ) );
+			}else{
+				p.playedTime = 0;
+			}
+		}else{
+			p.playedTime = client_max_seconds;
+		}
+
+		clif_send( &p, sizeof( p ), &sd.bl, SELF );
+	}
+#endif
+}
+
+void clif_parse_dynamic_npc( int fd, map_session_data* sd ){
+#if PACKETVER_MAIN_NUM >= 20140430 || PACKETVER_RE_NUM >= 20140430 || defined(PACKETVER_ZERO)
+	struct PACKET_CZ_DYNAMICNPC_CREATE_REQUEST* p = (struct PACKET_CZ_DYNAMICNPC_CREATE_REQUEST*)RFIFOP( fd, 0 );
+
+	char npcname[NPC_NAME_LENGTH + 1];
+
+	if( strncasecmp( "GOLDPCCAFE", p->name, sizeof( p->name ) ) == 0 ){
+		safestrncpy( npcname, p->name, sizeof( npcname ) );
+	}else{
+		return;
+	}
+
+	struct npc_data* nd = npc_name2id( npcname );
+
+	if( nd == nullptr ){
+		ShowError( "clif_parse_dynamic_npc: Original NPC \"%s\" was not found.\n", npcname );
+		clif_dynamicnpc_result( *sd, DYNAMICNPC_RESULT_UNKNOWNNPC );
+		return;
+	}
+
+	if( npc_duplicate_npc_for_player( *nd, *sd ) != nullptr ){
+		clif_dynamicnpc_result( *sd, DYNAMICNPC_RESULT_SUCCESS );
+	}
+#endif
+}
+
 /*==========================================
  * Main client packet processing function
  *------------------------------------------*/
@@ -25551,11 +25695,16 @@ static int clif_parse(int fd)
 
 	if (session[fd]->flag.eof) {
 		if (sd) {
-			if (sd->state.autotrade) {
+			if (sd->state.autotrade && !sd->state.afk) {
 				//Disassociate character from the socket connection.
 				session[fd]->session_data = NULL;
 				sd->fd = 0;
 				ShowInfo("Character '" CL_WHITE "%s" CL_RESET "' logged off (using @autotrade).\n", sd->status.name);
+			 }else if (sd->state.afk && sd->state.autotrade) {
+				//Disassociate character from the socket connection.
+				session[fd]->session_data = NULL;
+				sd->fd = 0;
+				ShowInfo("Character '" CL_WHITE "%s" CL_RESET "' logged off (using @afk).\n", sd->status.name);
 			} else
 			if (sd->state.active) {
 				// Player logout display [Valaris]

@@ -2289,4 +2289,6 @@ unsigned int *script_array_cpy_list(struct script_array *sa);
 
 bool script_check_RegistryVariableLength(int pType, const char *val, size_t* vlen);
 
+int sub_pc_clear_hattect(struct block_list* bl,va_list ap);
+
 #endif /* SCRIPT_HPP */

@@ -1312,6 +1312,18 @@ enum sc_type : int16 {
 
 	SC_VIPSTATUS = 1701,
 
+	SC_PREMIUMSERVICE = 1721,
+	SC_PREMIUMSERVICE_EXPBOOST_A,
+	SC_PREMIUMSERVICE_EXPBOOST_S,			
+	SC_PREMIUMSERVICE_JEXPBOOST_A,			
+	SC_PREMIUMSERVICE_JEXPBOOST_S,			
+	SC_PREMIUMSERVICE_ITEMBOOST_A,			
+	SC_PREMIUMSERVICE_ITEMBOOST_S,			
+	SC_PREMIUMSERVICE_STORAGE,				
+	SC_PREMIUMSERVICE_LIFEINSURANCE,
+
+	SC_AUTOATTACK = 1741,
+
 	SC_MAX, //Automatically updated max, used in for's to check we are within bounds.
 };
 
@@ -2741,6 +2753,39 @@ enum efst_type : short{
 
 	EFST_VIP_STATUS = 1701,
 
+	EFST_PREMIUMSERVICE = 1721,
+	EFST_PREMIUMSERVICE_EXPBOOST_A,
+	EFST_PREMIUMSERVICE_EXPBOOST_S,			
+	EFST_PREMIUMSERVICE_JEXPBOOST_A,			
+	EFST_PREMIUMSERVICE_JEXPBOOST_S,			
+	EFST_PREMIUMSERVICE_ITEMBOOST_A,			
+	EFST_PREMIUMSERVICE_ITEMBOOST_S,			
+	EFST_PREMIUMSERVICE_STORAGE,				
+	EFST_PREMIUMSERVICE_LIFEINSURANCE,
+
+	EFST_AUTOATTACK = 1741,
+
+	EFST_REFINE_PASS_LVL_1 = 1901,
+	EFST_REFINE_PASS_LVL_2 = 1902,
+	EFST_REFINE_PASS_LVL_3 = 1903,
+	EFST_REFINE_PASS_LVL_4 = 1904,
+	EFST_REFINE_PASS_LVL_5 = 1905,
+	EFST_REFINE_PASS_LVL_6 = 1906,
+	EFST_REFINE_PASS_LVL_7 = 1907,
+	EFST_REFINE_PASS_LVL_8 = 1908,
+	EFST_REFINE_PASS_LVL_9 = 1909,
+	EFST_REFINE_PASS_LVL_10 = 1910,
+	EFST_REFINE_PASS_LVL_11 = 1911,
+	EFST_REFINE_PASS_LVL_12 = 1912,
+	EFST_REFINE_PASS_LVL_13 = 1913,
+	EFST_REFINE_PASS_LVL_14 = 1914,
+	EFST_REFINE_PASS_LVL_15 = 1915,
+	EFST_REFINE_PASS_LVL_16 = 1916,
+	EFST_REFINE_PASS_LVL_17 = 1917,
+	EFST_REFINE_PASS_LVL_18 = 1918,
+	EFST_REFINE_PASS_LVL_19 = 1919,
+	EFST_REFINE_PASS_LVL_20 = 1920,	
+
 	EFST_MAX,
 };
 
@@ -3598,6 +3643,55 @@ public:
 
 extern CharBonusDatabase char_bonus_db;
 
-void pc_remove_char_bonus(map_session_data *sd);
+extern std::vector<int> refine_pass_locate;
+
+struct s_refine_pass {
+	uint16 refine;
+	efst_type icon;
+	struct script_code *script;	//Default script for everything.
+    
+	~s_refine_pass() {
+		if (this->script){
+			script_free_code(this->script);
+			this->script = nullptr;
+		}
+
+	}    
+};
+
+class RefinePassDatabase : public TypesafeYamlDatabase<uint16, s_refine_pass> {
+public:
+	RefinePassDatabase() : TypesafeYamlDatabase( "REFINE_PASS_DB", 1 ){
+
+	}
+
+	const std::string getDefaultLocation();
+	uint64 parseBodyNode(const ryml::NodeRef& node);
+};
+
+extern RefinePassDatabase refine_pass_db;
+
+void refine_pass_bonus(map_session_data* sd);
+void refine_pass_remove_bonus(map_session_data* sd);
+
+void status_clean_old_buff(map_session_data *sd);
+
+enum aa_reduce_drop_type : uint8 {
+	AA_HEALING	=	0x001,
+	AA_USABLE	=	0x002,
+	AA_ETC		=	0x004,
+	AA_ARMOR	=	0x008,
+	AA_WEAPON	=	0x010,
+	AA_CARD		=	0x020,
+};
+
+bool aa_check_target(map_session_data *sd, unsigned int id);
+int buildin_autopick_sub(struct block_list *bl, va_list ap);
+bool aa_check_item_pickup(map_session_data *sd, struct block_list *bl);
+unsigned int aa_check_item_pickup_onfloor(map_session_data *sd);
+int buildin_autoattack_sub(struct block_list *bl, va_list ap);
+unsigned int aa_check_target_alive(map_session_data *sd);
+bool aa_teleport(map_session_data *sd);
+void autoattack_clear(map_session_data *sd);
 
 #endif /* STATUS_HPP */

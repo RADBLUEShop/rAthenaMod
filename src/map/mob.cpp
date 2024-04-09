@@ -33,6 +33,7 @@
 #include "itemdb.hpp"
 #include "log.hpp"
 #include "map.hpp"
+#include "mapreg.hpp"
 #include "mercenary.hpp"
 #include "npc.hpp"
 #include "party.hpp"
@@ -1192,6 +1193,12 @@ int mob_spawn (struct mob_data *md)
 		return 2;
 	if( map_getmapdata(md->bl.m)->users )
 		clif_spawn(&md->bl);
+
+	if(md->spawn && md->spawn->state.boss){
+		std::string mapregname = "$" + std::to_string(md->mob_id) + "_" + std::to_string(md->bl.m);
+		mapreg_setreg(reference_uid( add_str( mapregname.c_str() ), 0 ),2);
+	}
+
 	skill_unit_move(&md->bl,tick,1);
 	mobskill_use(md, tick, MSC_SPAWN);
 	return 0;
@@ -2431,6 +2438,11 @@ void mob_damage(struct mob_data *md, struct block_list *src, int damage)
 		//Log damage
 		mob_log_damage(md, src, damage);
 		md->dmgtick = gettick();
+
+		if(src->type == BL_PC){
+			map_session_data *sd = (map_session_data *)src;
+			sd->aa.last_attack = gettick();
+		}			
 	}
 
 	if (battle_config.show_mob_info&3)
@@ -2493,6 +2505,12 @@ int mob_getdroprate(struct block_list *src, std::shared_ptr<s_mob_db> mob, int b
 			if (sd->sc.getSCE(SC_ITEMBOOST))
 				drop_rate_bonus += sd->sc.getSCE(SC_ITEMBOOST)->val1;
 
+			if (sd->sc.getSCE(SC_PREMIUMSERVICE_ITEMBOOST_A))
+				drop_rate_bonus += sd->sc.getSCE(SC_PREMIUMSERVICE_ITEMBOOST_A)->val1;
+				
+			if (sd->sc.getSCE(SC_PREMIUMSERVICE_ITEMBOOST_S))
+				drop_rate_bonus += sd->sc.getSCE(SC_PREMIUMSERVICE_ITEMBOOST_S)->val1;
+
 			int cap;
 
 			if (pc_isvip(sd)) { // Increase item drop rate for VIP.
@@ -2505,7 +2523,7 @@ int mob_getdroprate(struct block_list *src, std::shared_ptr<s_mob_db> mob, int b
 			drop_rate = (int)( 0.5 + drop_rate * drop_rate_bonus / 100. );
 
 			// Now limit the drop rate to never be exceed the cap (default: 90%), unless it is originally above it already.
-			if( drop_rate > cap && base_rate < cap ){
+			if( drop_rate > cap){
 				drop_rate = cap;
 			}
 		}
@@ -2815,6 +2833,49 @@ int mob_dead(struct mob_data *md, struct block_list *src, int type)
 			
 			drop_rate = mob_getdroprate(src, md->db, md->db->dropitem[i].rate, drop_modifier, md);
 
+			if(map_getmapflag(m, MF_HALFDROP)){
+				// reduce drop rate by half
+				drop_rate /= 2;
+			}
+			if(map_getmapflag(m, MF_QUARTERDROP)){
+				// reduce drop rate by quarter
+				drop_rate /= 4;
+			}
+			if(map_getmapflag(m, MF_TQUARTERDROP)){
+				// reduce drop rate by 25%
+				drop_rate -= drop_rate / 4;
+			}
+			if(map_getmapflag(m, MF_REDUCEDROP)){
+				if(map[m].reduce_drop_percent){
+					// reduce drop rate by value as percentage
+					drop_rate -= drop_rate * map[m].reduce_drop_percent / 100;
+				}
+			}
+
+			if(battle_config.autoattack_reduce_droprate && mvp_sd && mvp_sd->sc.getSCE(SC_AUTOATTACK)){
+
+				if(it->type==IT_HEALING && battle_config.autoattack_reduce_mode&AA_HEALING)
+					drop_rate = drop_rate * (100-battle_config.autoattack_reduce_droprate) / 100;
+
+				if(it->type==IT_USABLE && battle_config.autoattack_reduce_mode&AA_USABLE)
+					drop_rate = drop_rate * (100-battle_config.autoattack_reduce_droprate) / 100;
+
+				if((it->type==IT_ETC || it->type==IT_AMMO) && battle_config.autoattack_reduce_mode&AA_ETC)
+					drop_rate = drop_rate * (100-battle_config.autoattack_reduce_droprate) / 100;
+
+				if(it->type==IT_ARMOR && battle_config.autoattack_reduce_mode&AA_ARMOR)
+					drop_rate = drop_rate * (100-battle_config.autoattack_reduce_droprate) / 100;
+
+				if(it->type==IT_WEAPON && battle_config.autoattack_reduce_mode&AA_WEAPON)
+					drop_rate = drop_rate * (100-battle_config.autoattack_reduce_droprate) / 100;
+
+				if(it->type==IT_CARD && battle_config.autoattack_reduce_mode&AA_CARD)
+					drop_rate = drop_rate * (100-battle_config.autoattack_reduce_droprate) / 100;
+			}			
+
+			if(drop_rate < 0)
+				drop_rate = 0;
+
 			// attempt to drop the item
 			if (rnd() % 10000 >= drop_rate)
 				continue;
@@ -2836,6 +2897,38 @@ int mob_dead(struct mob_data *md, struct block_list *src, int type)
 			// Announce first, or else ditem will be freed. [Lance]
 			// By popular demand, use base drop rate for autoloot code. [Skotlex]
 			mob_item_drop(md, dlist, ditem, 0, battle_config.autoloot_adjust ? drop_rate : md->db->dropitem[i].rate, homkillonly || merckillonly);
+
+			// MvP and Mini-Boss Card Ad and Log System [Bad]
+			if (mvp_sd && battle_config.announcement_and_log_system) {
+
+				if (it->type == IT_CARD && md->get_bosstype() == BOSSTYPE_MVP && battle_config.mvp_card_announce_system) {
+					
+					if (battle_config.mvp_card_announce) {
+						char message[CHAT_SIZE_MAX];
+						sprintf (message, msg_txt(sd,1701), mvp_sd->status.name, md->name, mapindex_id2name(mvp_sd->mapindex), it->ename.c_str(), (float)drop_rate/100);
+						intif_broadcast2(message, strlen(message) + 1, battle_config.set_drop_announce_color, 0x190, 12, 0, 0);
+					}
+
+					if (battle_config.dropped_mvp_card_log) {
+						if ( SQL_ERROR == Sql_Query(mmysql_handle, "INSERT INTO boss_card_log (account_id, char_name, mvp_id, mvp_name, card_id, card_name, drop_map) VALUES ('%d', '%s', '%d', '%s', '%d', '%s', '%s')", mvp_sd->status.account_id, mvp_sd->status.name, md->mob_id, md->db->sprite.c_str(), it->nameid, it->name.c_str(),  mapindex_id2name(mvp_sd->mapindex))) // RMT Log System [Bad]
+						Sql_ShowDebug(mmysql_handle);
+					}
+				}
+
+				if (it->type == IT_CARD && md->get_bosstype() == BOSSTYPE_MINIBOSS && battle_config.mini_boss_card_announce_system) {
+					
+					if (battle_config.mini_boss_card_announce) {
+						char message[CHAT_SIZE_MAX];
+						sprintf (message, msg_txt(sd,1701), mvp_sd->status.name, md->name, mapindex_id2name(mvp_sd->mapindex), it->ename.c_str(), (float)drop_rate/100);
+						intif_broadcast2(message, strlen(message) + 1, battle_config.set_drop_card_announce_color, 0x190, 12, 0, 0);
+					}
+					
+					if (battle_config.dropped_mini_boss_card_log) {
+						if ( SQL_ERROR == Sql_Query(mmysql_handle, "INSERT INTO mini_boss_card_log (account_id, char_name, mini_boss_id, mini_boss_name, card_id, card_name, drop_map) VALUES ('%d', '%s', '%d', '%s', '%d', '%s', '%s')", mvp_sd->status.account_id, mvp_sd->status.name, md->mob_id, md->db->sprite.c_str(), it->nameid, it->name.c_str(),  mapindex_id2name(mvp_sd->mapindex))) // RMT Log System [Bad]
+						Sql_ShowDebug(mmysql_handle);
+					}
+				}
+			}
 		}
 
 		// Ore Discovery [Celest]
@@ -3171,6 +3264,16 @@ int mob_dead(struct mob_data *md, struct block_list *src, int type)
 	// MvP tomb [GreenBox]
 	if (battle_config.mvp_tomb_enabled && md->spawn->state.boss && map_getmapflag(md->bl.m, MF_NOTOMB) != 1)
 		mvptomb_create(md, mvp_sd ? mvp_sd->status.name : NULL, time(NULL));
+
+	if(md->spawn->state.boss){
+		std::string mapregname = "$" + std::to_string(md->db->id) + "_" + std::to_string(md->bl.m);
+		std::string mapregnamestr = mapregname + "$";
+		mapreg_setreg(reference_uid( add_str( mapregname.c_str() ), 0 ),1);
+		mapreg_setreg(reference_uid( add_str( mapregname.c_str() ), 1 ),md->bl.x);
+		mapreg_setreg(reference_uid( add_str( mapregname.c_str() ), 2 ),md->bl.y);
+		mapreg_setreg(reference_uid( add_str( mapregname.c_str() ), 3 ),time(NULL));
+		mapreg_setregstr(reference_uid( add_str( mapregnamestr.c_str() ), 4),mvp_sd ? mvp_sd->status.name : NULL);
+	}
 
 	if( !rebirth )
 		mob_setdelayspawn(md); //Set respawning.

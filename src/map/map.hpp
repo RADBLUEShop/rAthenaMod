@@ -505,6 +505,7 @@ enum _sp {
 	SP_CASHPOINTS, SP_KAFRAPOINTS,
 	SP_PCDIECOUNTER, SP_COOKMASTERY,
 	SP_ACHIEVEMENT_LEVEL,
+	SP_GOLDPC_POINTS,
 
 	// Mercenaries
 	SP_MERCFLEE=165, SP_MERCKILLS=189, SP_MERCFAITH=190,
@@ -674,6 +675,12 @@ enum e_mapflag : int16 {
 	MF_NODYNAMICNPC,
 	MF_NOBANK,
 	MF_NOEQUIP,
+	MF_NOAFK,
+	MF_HALFDROP,
+	MF_QUARTERDROP,
+	MF_TQUARTERDROP,
+	MF_REDUCEDROP,
+	MF_NOAUTOATTACK,
 	MF_MAX
 };
 
@@ -835,6 +842,7 @@ struct map_data {
 
 	/* speeds up clif_updatestatus processing by causing hpmeter to run only when someone with the permission can view it */
 	unsigned short hpmeter_visible;
+	int reduce_drop_percent;
 #ifdef MAP_GENERATOR
 	struct {
 		std::vector<const struct npc_data *> npcs;

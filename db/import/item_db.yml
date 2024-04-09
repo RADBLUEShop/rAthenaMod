@@ -102,3 +102,12 @@ Body:
     Type: Etc
     Buy: 1
     Weight: 1
+
+  - Id: 1111001
+    AegisName: AI_System
+    Name: AI System
+    Type: Delayconsume
+    Buy: 1
+    Weight: 1
+    Script: |
+      callfunc "F_AutoAT";    
