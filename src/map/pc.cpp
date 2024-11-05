@@ -16363,31 +16363,7 @@ TIMER_FUNC(vip_delete_timer){
 	sd->vip_timer_tid = INVALID_TIMER;
 	return 0;
 }
-/* Animation Timer */
-TIMER_FUNC(pc_animation_force_timer) {
-	map_session_data* sd = map_id2sd(id);
-	if (sd == nullptr)
-		return 0;
-	if (DIFF_TICK(sd->animation_force.tid, gettick()) > 0) {
-		clif_authfail_fd(sd->fd, 15);
-		ShowWarning("fail on animation timer sync from char id: %d \n", sd->status.char_id);
-	}
-	else if (sd->animation_force.iter < sd->animation_force.hitcount) {
-		
-		
-		clif_hit_frame(&sd->bl);
-		sd->ud.canmove_tick = gettick() + data;
-		sd->animation_force.tid = add_timer(gettick() + data, pc_animation_force_timer, sd->bl.id, data);
-		sd->animation_force.iter++;
-	}
-	else {
-		sd->animation_force.tid = INVALID_TIMER;
-		sd->animation_force.iter = 0;
-		sd->animation_force.hitcount = 0;
-		
-	}
-	return 0;
-}
+
 /*==========================================
  * pc Init/Terminate
  *------------------------------------------*/
@@ -16437,8 +16413,6 @@ void do_init_pc(void) {
 	add_timer_func_list(pc_macro_detector_timeout, "pc_macro_detector_timeout");
 	add_timer_func_list( pc_goldpc_update, "pc_goldpc_update" );
 
-	// force amotion animation timer [AoShinHo]
-	add_timer_func_list(pc_animation_force_timer, "pc_animation_force_timer");
 	add_timer(gettick() + autosave_interval, pc_autosave, 0, 0);
 
 	// 0=day, 1=night [Yor]

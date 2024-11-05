@@ -121,10 +121,7 @@ void login_remove_online_user(uint32 account_id) {
 		delete_timer( p->waiting_disconnect, login_waiting_disconnect_timer );
 	}
 
-	// accounts->disable_webtoken( accounts, account_id );
-	if(login_config.use_web_auth_token) {
-		accounts->disable_webtoken( accounts, account_id);
-	}
+	accounts->disable_webtoken( accounts, account_id );
 
 	online_db.erase( account_id );
 }

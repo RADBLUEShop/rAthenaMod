@@ -11571,11 +11571,6 @@ static const struct _battle_data {
 	{ "refine_option_color_self",			&battle_config.refine_option_color_self, 0xff0000,      0,      INT_MAX,		},
 	{ "refine_broken_color",				&battle_config.refine_broken_color, 	 0xff0000,      0,      INT_MAX,		},
 	{ "refine_normal_color",				&battle_config.refine_normal_color, 	 0xff0000,      0,      INT_MAX,		},
-#ifdef RENEWAL
-	{ "feature.restore_animation_skills",   &battle_config.feature_restore_animation_skills,0,      0,      1, },
-#else
-	{ "feature.restore_animation_skills",   &battle_config.feature_restore_animation_skills,1,      0,      1, },
-#endif
 
 #include <custom/battle_config_init.inc>
 };
@@ -11800,12 +11795,7 @@ void battle_adjust_conf()
 		battle_config.feature_barter_extended = 0;
 	}
 #endif
-#if PACKETVER < 20181128
-	if (battle_config.feature_restore_animation_skills) {
-		ShowWarning("conf/battle/feature.conf restore skill forced attack motion system is enabled but it requires PACKETVER 2018-11-28 or newer, disabling...\n");
-		battle_config.feature_restore_animation_skills = 0;
-	}
-#endif
+
 #ifndef CELL_NOSTACK
 	if (battle_config.custom_cell_stack_limit != 1)
 		ShowWarning("Battle setting 'custom_cell_stack_limit' takes no effect as this server was compiled without Cell Stack Limit support.\n");
