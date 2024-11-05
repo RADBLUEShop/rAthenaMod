@@ -1,0 +1,26 @@
+//			@reloadnpc npc/core/collection.txt
+
+-	script	roulette_menu	-1,{
+	end;
+
+OnRouLetteClick:
+	mes "[ข้อมุลตัวละคร]";
+	next;
+	switch(select("^ff0000~^000000 Collection:^ff0000~^000000 ระบบ Ai")) {
+		case 1:
+			opencollection();
+			close;
+			
+		case 2:
+			callfunc "F_AutoAT";
+			close;
+			}
+	
+	end;
+
+OnInit:
+	.npc_name$ = "[^FF0000•^000000 ^2f00ffCollection menu^000000 ^FF0000•^000000]";
+	$@roulette_npc$ = "roulette_menu";
+	$@roulette_event$ = "OnRouLetteClick";
+	end;
+}

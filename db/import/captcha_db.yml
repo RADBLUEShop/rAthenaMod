@@ -33,3 +33,6 @@ Header:
   Version: 1
 
 Body:
+  - Id: 1
+    Filename: captcha/001.bmp
+    Answer: 2000

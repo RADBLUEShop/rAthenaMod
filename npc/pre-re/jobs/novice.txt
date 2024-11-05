@@ -1,0 +1,459 @@
+//===== rAthena Script ======================================= 
+//= Ep 10+ Novice Training Grounds
+//===== By: ================================================== 
+//= Dr.Evil & MasterOfMuppets
+//===== Current Version: ===================================== 
+//= 2.4
+//===== Compatible With: ===================================== 
+//= rAthena Project; SVN 3422+
+//===== Description: ========================================= 
+//= [Official Conversion]
+//= Novice Training Grounds
+//===== Additional Comments: ================================= 
+//= 1.7D Added confirm character name thing on receptionist. [Kisuka]
+//= 1.8 Rescripted to Aegis 10.3 standards. [L0ne_W0lf]
+//=     NPCs are not backwards compatable, and will remove
+//=     old variables used in the previous novice grounds.
+//= 1.9 Fixed problem with Hanson's dialog. (bugreport:1703) [L0ne_W0lf]
+//=     Fixed Entrance Guard clearing vars. (bugreport:1695)
+//=     Added duplicate NPCs to combat training maps.
+//= 2.0 Fixed savepoint not being changed sometimes. [L0ne_W0lf]
+//= 2.1 Corrected spacing issue in welcome message. [L0ne_W0lf]
+//= 2.2 Corrected Leo's endless dialog. [L0ne_W0lf]
+//= 2.3 Added fix to Hanson from GM-windsor- and Saithis. [L0ne_W0lf]
+//= 2.3a Correct a wrong variable name. (bugreport:2293) [Samuray22]
+//= 2.4 Corrected an error in Hanson. (bugreport:2374) [L0ne_W0lf]
+//============================================================ 
+
+
+// Bulletin Board
+new_1-1,66,114,4	script	Bulletin Board#nv	111,{
+	mes "^FF0000=================================^000000";
+	mes "^E40CAAยินดีต้อนรับสู่^FF8040 Training Ground^000000";
+	mes "^0000FFโปรดเดินไปตามทางเพื่อรับภารกิจ^000000";
+	mes "^0000FFและทดสอบความสามารถของท่านค่ะ^000000";
+	mes "^E40CAAขอให้สนุกนะค่ะ^_^^000000";
+	mes "^FF0000=================================^000000";
+	close;
+OnInit:
+	.delay = 200;
+	.title$ = "ยินดีต้อนรับผู้เล่นใหม่";
+	
+	.string_size = getstrlen( .title$ );
+	while( 1 ){
+		.@title$[ .@i ] = charat( .title$,.@i );
+		delwaitingroom;
+		waitingroom ""+implode( .@title$,"" ),0;
+		.@i++;
+		if( .@i > .string_size ){
+			.@i = 0;
+			deletearray .@title$;
+		}
+		sleep .delay;
+    }
+    end;
+}
+
+new_1-1,144,116,2	script	Guard#nv1	105,{
+	mes "[Training Grounds Guard]";
+	mes "ยินดีต้อนรับสู่ Training Grounds.";
+	mes "คุณน่าจะลองสำรวจสถานที่นี้ดูรอบๆนะ แต่ถ้าเบื่อแล้วอยากจะลองฝึกละก็เชิญเข้าไปในปราสาทได้เลย";
+	close;
+}
+
+new_1-1,144,107,2	script	Guard#nv2	105,{
+	mes "[Training Grounds Guard]";
+	if(rand(2)) {
+		mes "เข้ามาเลย";
+		mes "ข้าภูมิใจทุกๆครั้งที่ได้เห็นนักผจญภัยหน้าใหม่";
+		mes "ยินดีต้อนรับคุณเข้าสู่";
+		mes "the Training Grounds!";
+		next;
+		mes "[Training Grounds Guard]";
+		mes "ข้างในนี้ เป็นสถานที่ฝึกฝนของ Novice หน้าใหม่ อย่างดีเยี่ยมเลย";
+		mes "ที่นี่ มีความปลอดภัยมาก พร้อมที่จะให้เจ้าได้ฝึก";
+		mes "เพื่อรับมือกับความยากลำบากที่อาจพบได้ในอนาคตของ";
+	}
+	else {
+		mes "ที่นี่เป็นสถานที่ของ Novice เท่านั้น เจ้าควรจะไปที่ๆเจ้าควรอยู่";
+	}
+	close;
+}
+
+// Receptionist
+new_1-2,100,29,4	script	Receptionist#nv1	86,{
+	
+	if(getskilllv("NV_BASIC") > 1)
+	{
+		mes "^0066FF[ Training Grounds Receptionist ]^000000";
+		mes "ท่านไม่ได้รับอนุญาติ";
+		mes "ให้เข้าสู่ Training Grounds";
+		close;
+	}
+
+	mes "^0066FF[ Training Grounds Receptionist ]^000000";
+	mes "สวัสดี นายท่าน,";
+	mes "คงเป็นนักผจญภัยหน้าใหม่สิน่ะ";
+	mes "แล้วท่านมีชื่อว่าอะไรหรอ ?";
+	next;
+	mes "^0066FF[ Training Grounds Receptionist ]^000000";
+	mes "นี่หรอ ชื่อท่าน,^ff0000 "+strcharinfo(0)+" ^000000";
+	next;
+	switch(select("~ ใช่ นี่ล่ะชื่อของฉันเอง")) {
+		case 1:
+			mes "^0066FF[ Training Grounds Receptionist ]^000000";
+			mes "ยินดีต้อนรับท่านเข้าสู่";
+			mes "^0000ffTraining Grounds^000000";
+			next;
+			mes "^0066FF[ Training Grounds Receptionist ]^000000";
+			mes "ท่านกำลังเข้าสู่การผจญภัยครั้งใหม่";
+			mes "ในโลกแห่ง Ragnarok";
+			mes "โปรดฟังคำแนะนำสำหรับ ^0000ffTraining Grounds^000000";
+			mes "เพื่อเป็นข้อมูลเพิ่มเติมของท่าน !";
+			next;
+			switch(select("~ เริ่มเข้าเล่น Ragnarok ทันที..")) {
+				case 1:
+					mes "^0066FF[ Training Grounds Receptionist ]^000000";
+					mes "ฉันเข้าใจท่านแล้ว !";
+					mes "ขอให้ท่านจะตั้งใจทำมันให้ดีที่สุด";
+					mes "โชคดีล่ะ บ๊ะบาย !!";
+					close2;
+					set nov_1st_cos,0;
+					set nov_2nd_cos,0;
+					set nov_3_swordman,0;
+					set nov_3_archer,0;
+					set nov_3_thief,0;
+					set nov_3_magician,0;
+					set nov_3_acolyte,0;
+					set nov_3_merchant,0;
+					getitem 569,200;
+					getitem 12323,50;
+					getitem 12324,5;
+					getitem 7059,10;
+					getitem 7060,10;
+					getitem 2352,1;
+					getitem 5055,1;
+					getitem 2414,1;
+					getitem 2510,1;
+					getitem 2112,1;
+					getitem 1243,1;
+					getitem 410022,2;
+					getitem 410024,2;
+					rentitem 750002,604800;
+					equip 750002,getcharid(0);
+					equip 2352,getcharid(0);
+					equip 5055,getcharid(0);
+					equip 2414,getcharid(0);
+					equip 2510,getcharid(0);
+					equip 2112,getcharid(0);
+					equip 1243,getcharid(0);
+					
+					savepoint "new_1-3",96,21;
+					warp "new_1-3",96,21;
+					break;
+			}	
+	}	
+OnInit:
+	.delay = 100;
+	.title$ = "เข้าฝึกการผจญภัยที่นี้";
+	
+	.string_size = getstrlen( .title$ );
+	while( 1 ){
+		.@title$[ .@i ] = charat( .title$,.@i );
+		delwaitingroom;
+		waitingroom ""+implode( .@title$,"" ),0;
+		.@i++;
+		if( .@i > .string_size ){
+			.@i = 0;
+			deletearray .@title$;
+		}
+		sleep .delay;
+    }
+    end;
+}
+
+new_1-3,96,175,5	script	Gate Keeper#nv1::NovKeyman	85,{
+	mes "^0066FF[ Gate Keeper ]^000000";
+	mes "ฉันจะไม่อนุญาติให้ Novice";
+	mes "ที่ยังไม่พร้อมเผชิญโลกกว้างผ่าน";
+	mes "ไปเด็ดขาดเพื่อความปลอดภัยของเจ้าเอง";
+	next;
+	mes "^0066FF[ Gate Keeper ]^000000";
+	mes "เจ้าจะต้องมี Job 10 ขึ้นไป";
+	mes "และทำการอัพ Basic Skill Lv 9";
+	mes "และมีพื้นฐานในการใช้ชีวิตเสียก่อน!";
+	next;
+	mes "^0066FF[ Gate Keeper ]^000000";
+	mes "เมื่อก่อนผู้คนมากมาย";
+	mes "ได้ตายลงเพราะเราไม่มีการคัดกรอง";
+	mes "ไหนตอบมาสิ! เจ้าพร้อมหรือไม่!";
+	next;
+	switch(select("^ff0000~^000000 ฉันพร้อมการผจญภัยแล้ว..!:^ff0000~^000000 ไม่ล่ะ, ขอบคุณ")) {
+	case 1:
+		
+		if(getskilllv("NV_BASIC")< 9)
+		{
+			mes "^0066FF[ Gate Keeper ]^000000";
+			mes "เจ้ายังไม่มีคุณสมบัติพอ!";
+			mes "Basic Skill เลเวล 9";
+			mes "นั่นคือสิ่งที่ฉันต้องการ";
+			mes "อัพสกิลแล้ว ลองใหม่อีกครั้ง..";
+			end;
+		}
+		else
+		{
+			mes "^0066FF[ Gate Keeper ]^000000";
+			mes "โชคดีล่ะ นายท่าน !";
+			mes "ขอให้ท่านเดินทางอย่างปลอดภัย";
+			close2;
+			savepoint "morocc",159,47;
+			warp "morocc",159,47;
+			end;
+		}
+	case 2:
+		mes "^0066FF[ Gate Keeper ]^000000";
+		mes "หากเจ้าคิดว่าพร้อมเดิน";
+		mes "ที่จะเดินผ่านประตูนี้ไปจงมาหาข้า!";
+		end;
+	}
+OnInit:
+	.delay = 150;
+	.title$ = "เข้าสู่โลก Ragnarok";
+	
+	.string_size = getstrlen( .title$ );
+	while( 1 ){
+		.@title$[ .@i ] = charat( .title$,.@i );
+		delwaitingroom;
+		waitingroom ""+implode( .@title$,"" ),0;
+		.@i++;
+		if( .@i > .string_size ){
+			.@i = 0;
+			deletearray .@title$;
+		}
+		sleep .delay;
+    }
+    end;
+}
+
+new_2-3,96,175,5	duplicate(NovKeyman)	Gate Keeper#nv2	85
+
+//============================================================================
+// Trainer (Real Combat Training)
+//============================================================================
+-	script	Level 1 Trainer#nv::NvBrutus	84,{
+	mes "^0066FF[ Trainer Brutus ]^000000";
+	mes "สวัสดี.. เห้อออ ที่นี่ช่างน่าเบื่อเสียจริง ~";
+	mes "เจ้าคิดว่าอย่างนั้นไหม..";
+	next;
+	switch(select("^ff0000•^000000 ข้าก็ว่าอย่างนั้น.. พาข้าไปที่อื่นทีเถอะ!:^ff0000•^000000 ข้าชอบที่นี่้..")) {
+	case 1:
+		mes "^0066FF[ Trainer Brutus ]^000000";
+		mes "ตกลง, ข้าจะพาเจ้าไปที่อื่นแล้วกัน";
+		mes "ไหน...ยืนยันกับข้าอีกรอบสิ๊ !!";
+		next;
+		for(set .@i,1; .@i<3; set .@i,.@i+1) {
+			if (!compare(strnpcinfo(2),"nv"+.@i))
+				set .@menu$, .@menu$+"^ff0000•^000000 พาไปยังห้องที่ "+.@i;
+			set .@menu$, .@menu$+":";
+		}
+		set .@i, select(.@menu$+"^ff0000•^000000 ยกเลิก");
+		if (.@i < 3) warp "new_"+.@i+"-3",96,21;
+		close;
+	case 2:
+		mes "^0066FF[ Trainer Brutus ]^000000";
+		mes "อืม...";
+		mes "ขอให้เจ้าสนุกกับที่นี่แล้วกันนะ";
+		close;
+	}
+OnInit:
+	.delay = 200;
+	.title$ = "ย้ายไปอีกแผนที่";
+	
+	.string_size = getstrlen( .title$ );
+	while( 1 ){
+		.@title$[ .@i ] = charat( .title$,.@i );
+		delwaitingroom;
+		waitingroom ""+implode( .@title$,"" ),0;
+		.@i++;
+		if( .@i > .string_size ){
+			.@i = 0;
+			deletearray .@title$;
+		}
+		sleep .delay;
+    }
+    end;
+}	
+
+new_1-3,91,37,4	script	Healer Officer#city37	696,{
+	set .@Price,3000;
+	set .@Delay,5;	
+	set .@BaseLevel,50;
+	if ( gettimetick(2) - @healab < .@Delay ) { message strcharinfo(0),"[ แจ้งเตือน ! ] กรุณา เว้นระยะเวลาสักครู่  และลองกดรับใหม่อีกครั้งค่ะ"; end;}
+	
+	set @healab,gettimetick(2);
+	// ตั้งค่า effect & progress
+
+	// ตั้งค่า ซ่อมอุปกรณ์
+	set .@checkitem,1;
+		while (1) {
+			if (getbrokenid(.@checkitem) == 0) {
+				break;
+			}
+			set .@checkitem,.@checkitem+1;
+		}
+		set .@checkitem,.@checkitem-1;
+
+			set .@checkitem2,1;
+			while (1) {
+				if (getbrokenid(.@checkitem2) == 0) {
+					break;
+				}
+				set .@checkitem2,.@checkitem2+1;
+			}
+			set .@checkitem2,.@checkitem2-1;
+			if (.@checkitem == .@checkitem2) {
+				while (.@checkitem) {
+					repair(.@checkitem);
+					set .@checkitem,.@checkitem-1;
+					message strcharinfo(0),"[ แจ้งเตือน ! ] อุปกรณ์ได้รับการซ่อมเรียบร้อยแล้ว!";
+				}
+			}
+
+
+	// ตั้งค่า Lv ต่ำกว่า 70
+	if (BaseLevel <= .@BaseLevel) {
+		mes "[Buff Server]";
+		mes "ท่านมี LV.ต่ำกว่า 50";
+		mes "สามารถใช้บริการบัฟฟรีได้ดังนี้";
+		mes "AB Lv.5 นาน 15นาที";
+		next;
+		//แก้สถานะต่างๆ
+		sc_end SC_POISON;
+		sc_end SC_FREEZE;
+		sc_end SC_SLEEP;
+		sc_end SC_STAN;
+		sc_end SC_STUN;
+		sc_end SC_STONE;
+		sc_end SC_SILENCE;
+		sc_end SC_BLIND;
+		sc_end SC_Bleeding;
+		sc_end SC_CONFUSION;
+		sc_end SC_CURSE;
+		sc_end SC_HALLUCINATION;
+		sc_end SC_ORCISH;
+		
+		//บัพสกิลต่างๆ
+		sc_start SC_BLESSING,900000,5;
+		sc_start SC_INCREASEAGI,900000,5;		
+		
+		sleep2 250;
+		progressbar "0x007000",0;
+	
+		specialeffect2 42;
+		specialeffect2 37;
+		specialeffect2 56;
+		specialeffect EF_SANCTUARY;
+		specialeffect2 509;
+		specialeffect 509;
+		emotion ET_SCRATCH;
+		mes "ขอบพระคุณที่ใช้บริการ";
+		close;
+	
+	} else if (BaseLevel >= .@BaseLevel) {
+	
+	
+	mes "[Buff Server]";
+		mes "ท่านมี LV.มากกว่า 50";
+		mes "มีค่าบริการบัฟ 3,000 zeny";
+		mes "AB Lv.10 นาน 5นาที";
+		next;
+		switch(select("^ff0000~^000000 ฉันต้องการบัฟ:^ff0000~^000000 ไม่ล่ะ, ขอบคุณ")) {
+		case 1:
+		if ( Zeny >= 3000 ) {
+		mes "[Buff Server]";
+		mes "ขอพลังจงสถิในตัวท่าน";
+		//แก้สถานะต่างๆ
+		sc_end SC_POISON;
+		sc_end SC_FREEZE;
+		sc_end SC_SLEEP;
+		sc_end SC_STAN;
+		sc_end SC_STUN;
+		sc_end SC_STONE;
+		sc_end SC_SILENCE;
+		sc_end SC_BLIND;
+		sc_end SC_Bleeding;
+		sc_end SC_CONFUSION;
+		sc_end SC_CURSE;
+		sc_end SC_HALLUCINATION;
+		sc_end SC_ORCISH;
+		
+		//บัพสกิลต่างๆ
+		sc_start SC_BLESSING,300000,10;
+		sc_start SC_INCREASEAGI,300000,10;		
+		
+		sleep2 250;
+		progressbar "0x007000",0;
+	
+		specialeffect2 42;
+		specialeffect2 37;
+		specialeffect2 56;
+		specialeffect EF_SANCTUARY;
+		specialeffect2 509;
+		specialeffect 509;
+		emotion ET_SCRATCH;
+		set Zeny, Zeny-.@Price;
+		next;
+		mes "[Buff Server]";
+		mes "ขอบพระคุณที่ใช้บริการ";
+		close;
+		}
+		
+		else{
+			mes "[Buff Server]";
+			mes "เสียใจด้วยท่านมี Zeny ไม่เพียงพอ";
+			close;
+			}
+		case 2:
+			mes "[Buff Server]";
+			mes "ไว้เจอกันคราวหน้า.";
+			close;
+			}
+		
+		}	
+	end;
+
+OnInit:
+	.delay = 150;
+	.title$ = "Buffts ผู้เล่นใหม่";
+	
+	.string_size = getstrlen( .title$ );
+	while( 1 ){
+		.@title$[ .@i ] = charat( .title$,.@i );
+		delwaitingroom;
+		waitingroom ""+implode( .@title$,"" ),0;
+		.@i++;
+		if( .@i > .string_size ){
+			.@i = 0;
+			deletearray .@title$;
+		}
+		sleep .delay;
+    }
+    end;
+}
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+
+
+// Training Ground Mobs
+new_1-3,0,0,0,0	monster	Poring	1002,40
+new_1-3,0,0,0,0	monster	Drops	1113,40
+new_1-3,0,0,0,0	monster	Lunatic	1063,40
+new_1-3,0,0,0,0	monster	ChonChon	1011,35
+new_1-3,0,0,0,0	monster	Condor	1009,30
+new_1-3,0,0,0,0	monster	Picky	1050,35
+new_1-3,0,0,0,0	monster	Willow	1010,35
+new_1-3,0,0,0,0	monster	Roda Frog	1012,55
+new_1-3,0,0,0,0	monster	Rocker	1052,15
+new_1-3,0,0,0,0	monster	Thief Bug	1051,10
+new_1-3,0,0,0,0	monster	Spore	1014,30
+new_1-3,0,0,0,0	monster	Fabre	1184,10

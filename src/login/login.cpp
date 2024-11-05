@@ -121,7 +121,10 @@ void login_remove_online_user(uint32 account_id) {
 		delete_timer( p->waiting_disconnect, login_waiting_disconnect_timer );
 	}
 
-	accounts->disable_webtoken( accounts, account_id );
+	// accounts->disable_webtoken( accounts, account_id );
+	if(login_config.use_web_auth_token) {
+		accounts->disable_webtoken( accounts, account_id);
+	}
 
 	online_db.erase( account_id );
 }
@@ -806,7 +809,20 @@ void LoginServer::finalize(){
 		aFree(tmp);
 	}
 
+// (^~_~^) Gepard Shield Start
+/*
+// (^~_~^) Gepard Shield End
 	login_log(0, "login server", 100, "login server shutdown");
+// (^~_~^) Gepard Shield Start
+*/
+// (^~_~^) Gepard Shield End
+
+// (^~_~^) Gepard Shield Start
+
+	login_gepard_log(0, 0, "login server", 100, "login server shutdown");
+
+// (^~_~^) Gepard Shield End
+
 	ShowStatus("Terminating...\n");
 
 	if( login_config.log_login )
@@ -899,7 +915,19 @@ bool LoginServer::initialize( int argc, char* argv[] ){
 	do_init_logincnslif();
 
 	ShowStatus("The login-server is " CL_GREEN "ready" CL_RESET " (Server is listening on the port %u).\n\n", login_config.login_port);
+// (^~_~^) Gepard Shield Start
+/*
+// (^~_~^) Gepard Shield End
 	login_log(0, "login server", 100, "login server started");
+// (^~_~^) Gepard Shield Start
+*/
+// (^~_~^) Gepard Shield End
+
+// (^~_~^) Gepard Shield Start
+
+	login_gepard_log(0, 0, "login server", 100, "login server started");
+
+// (^~_~^) Gepard Shield End
 
 	return true;
 }

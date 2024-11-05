@@ -1,0 +1,149 @@
+
+//==============================================
+// - Script By : M-Ro Online
+// - Script City : Thailand 
+// - Script Support Server : Hercules & rAthena
+//==============================================
+-	script	BuffsSupports	-1,{
+	set .@Price,3000;
+	set .@Delay,5;	
+	set .@BaseLevel,50;
+	if ( gettimetick(2) - @healab < .@Delay ) { message strcharinfo(0),"[ แจ้งเตือน ! ] กรุณา เว้นระยะเวลาสักครู่  และลองกดรับใหม่อีกครั้งค่ะ"; end;}
+	
+	set @healab,gettimetick(2);
+	// ตั้งค่า effect & progress
+
+	// ตั้งค่า ซ่อมอุปกรณ์
+	set .@checkitem,1;
+		while (1) {
+			if (getbrokenid(.@checkitem) == 0) {
+				break;
+			}
+			set .@checkitem,.@checkitem+1;
+		}
+		set .@checkitem,.@checkitem-1;
+
+			set .@checkitem2,1;
+			while (1) {
+				if (getbrokenid(.@checkitem2) == 0) {
+					break;
+				}
+				set .@checkitem2,.@checkitem2+1;
+			}
+			set .@checkitem2,.@checkitem2-1;
+			if (.@checkitem == .@checkitem2) {
+				while (.@checkitem) {
+					repair(.@checkitem);
+					set .@checkitem,.@checkitem-1;
+					message strcharinfo(0),"[ แจ้งเตือน ! ] อุปกรณ์ได้รับการซ่อมเรียบร้อยแล้ว!";
+				}
+			}
+
+
+	// ตั้งค่า Lv ต่ำกว่า 70
+	if (BaseLevel <= .@BaseLevel) {
+		mes "[Buff Server]";
+		mes "ท่านมี LV.ต่ำกว่า 50";
+		mes "สามารถใช้บริการบัฟฟรีได้ดังนี้";
+		mes "AB Lv.5 นาน 15นาที";
+		next;
+		//แก้สถานะต่างๆ
+		sc_end SC_POISON;
+		sc_end SC_FREEZE;
+		sc_end SC_SLEEP;
+		sc_end SC_STAN;
+		sc_end SC_STUN;
+		sc_end SC_STONE;
+		sc_end SC_SILENCE;
+		sc_end SC_BLIND;
+		sc_end SC_Bleeding;
+		sc_end SC_CONFUSION;
+		sc_end SC_CURSE;
+		sc_end SC_HALLUCINATION;
+		sc_end SC_ORCISH;
+		
+		//บัพสกิลต่างๆ
+		sc_start SC_BLESSING,900000,5;
+		sc_start SC_INCREASEAGI,900000,5;		
+		
+		sleep2 250;
+		progressbar "0x007000",0;
+	
+		specialeffect2 42;
+		specialeffect2 37;
+		specialeffect2 56;
+		specialeffect EF_SANCTUARY;
+		specialeffect2 509;
+		specialeffect 509;
+		emotion ET_SCRATCH;
+		mes "ขอบพระคุณที่ใช้บริการ";
+		close;
+	
+	} else if (BaseLevel >= .@BaseLevel) {
+	
+	
+	mes "[Buff Server]";
+		mes "ท่านมี LV.มากกว่า 50";
+		mes "มีค่าบริการบัฟ 3,000 zeny";
+		mes "AB Lv.10 นาน 5นาที";
+		next;
+		switch(select("^ff0000~^000000 ฉันต้องการบัฟ:^ff0000~^000000 ไม่ล่ะ, ขอบคุณ")) {
+		case 1:
+		if ( Zeny >= 3000 ) {
+		mes "[Buff Server]";
+		mes "ขอพลังจงสถิในตัวท่าน";
+		//แก้สถานะต่างๆ
+		sc_end SC_POISON;
+		sc_end SC_FREEZE;
+		sc_end SC_SLEEP;
+		sc_end SC_STAN;
+		sc_end SC_STUN;
+		sc_end SC_STONE;
+		sc_end SC_SILENCE;
+		sc_end SC_BLIND;
+		sc_end SC_Bleeding;
+		sc_end SC_CONFUSION;
+		sc_end SC_CURSE;
+		sc_end SC_HALLUCINATION;
+		sc_end SC_ORCISH;
+		
+		//บัพสกิลต่างๆ
+		sc_start SC_BLESSING,300000,10;
+		sc_start SC_INCREASEAGI,300000,10;		
+		
+		sleep2 250;
+		progressbar "0x007000",0;
+	
+		specialeffect2 42;
+		specialeffect2 37;
+		specialeffect2 56;
+		specialeffect EF_SANCTUARY;
+		specialeffect2 509;
+		specialeffect 509;
+		emotion ET_SCRATCH;
+		set Zeny, Zeny-.@Price;
+		next;
+		mes "[Buff Server]";
+		mes "ขอบพระคุณที่ใช้บริการ";
+		close;
+		}
+		
+		else{
+			mes "[Buff Server]";
+			mes "เสียใจด้วยท่านมี Zeny ไม่เพียงพอ";
+			close;
+			}
+		case 2:
+			mes "[Buff Server]";
+			mes "ไว้เจอกันคราวหน้า.";
+			close;
+			}
+		
+		}	
+	end;
+}
+
+
+
+
+

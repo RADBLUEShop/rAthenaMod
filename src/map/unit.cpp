@@ -2090,6 +2090,29 @@ int unit_skilluse_id2(struct block_list *src, int target_id, uint16 skill_id, ui
 	if( sd && battle_config.prevent_logout_trigger&PLT_SKILL )
 		sd->canlog_tick = gettick();
 
+	/*==========================
+	 RESTORE ANIMATION BY AOSHINHO
+	============================*/
+
+	if (battle_config.feature_restore_animation_skills && src->type & BL_PC)
+	{
+		switch (skill_id)
+		{
+#if PACKETVER >= 20191016
+		case GC_CROSSIMPACT:
+			clif_animation_force_packet(sd, skill_id, 3);
+			break;
+#endif
+		case AS_SONICBLOW:
+		case CG_ARROWVULCAN:
+			clif_animation_force_packet(sd, skill_id, 8);
+			break;
+		default:
+			break;
+		}
+	}
+
+
 	return 1;
 }
 
@@ -2975,6 +2998,11 @@ void unit_dataset(struct block_list *bl)
 	ud->attackabletime =
 	ud->canact_tick    =
 	ud->canmove_tick   = gettick();
+
+	struct s_unit_common_data* ucd = status_get_ucd(bl);
+	if (ucd) {
+		memset(ucd, 0, sizeof(struct s_unit_common_data));
+	}	
 }
 
 /**
